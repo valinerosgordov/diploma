@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:ml_practice/pages/report_generation_screen.dart';
+import 'package:ml_practice/pages/report_history_screen.dart';
 import 'package:pie_chart/pie_chart.dart';
 import 'dart:io';
 import 'services/photo_classifier_service.dart';
@@ -53,6 +54,71 @@ class _MyHomePageState extends State<MyHomePage> {
   final AutoTaggingService _autoTagger = AutoTaggingService();
 
   bool _isAnalyzing = false;
+  bool _isEditingFileTypes = false;
+
+  // Dynamic file type mappings
+  Map<String, Set<String>> _fileTypeMappings = {
+    'images': {
+      'jpg',
+      'jpeg',
+      'png',
+      'gif',
+      'bmp',
+      'webp',
+      'svg',
+      'tiff',
+      'ico',
+      'raw'
+    },
+    'documents': {
+      'pdf',
+      'doc',
+      'docx',
+      'txt',
+      'rtf',
+      'odt',
+      // 'pages',
+      'epub',
+      'md',
+      'tex'
+    },
+    'multimedia': {
+      'mp3',
+      'mp4',
+      'wav',
+      'avi',
+      'mov',
+      'mkv',
+      'flv',
+      'wmv',
+      'webm',
+      'm4a',
+      'm4v'
+    },
+    'code': {
+      'js',
+      'py',
+      'java',
+      'cpp',
+      'cs',
+      'html',
+      'css',
+      'php',
+      'rb',
+      'swift',
+      'kt',
+      'dart',
+      'go'
+    },
+    'archives': {'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'iso'},
+    'spreadsheets': {'xls', 'xlsx', 'csv', 'ods', 'numbers'},
+    'presentations': {'ppt', 'pptx', 'key', 'odp'},
+    'databases': {'sql', 'db', 'sqlite', 'mdb', 'accdb'},
+    'fonts': {'ttf', 'otf', 'woff', 'woff2', 'eot'},
+    'system': {'exe', 'dll', 'sys', 'bat', 'sh', 'app', 'dmg', 'deb', 'rpm'}
+  };
+
+  final TextEditingController _newExtensionController = TextEditingController();
   List<FileSystemEntity> _selectedFiles = [];
   Map<String, double> _fileDistribution = {};
   int _totalFiles = 0;
@@ -182,14 +248,61 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   String _getFileType(String extension) {
-    final imageExts = {'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'};
-    final docExts = {'pdf', 'doc', 'docx', 'txt', 'rtf'};
-    final mediaExts = {'mp3', 'mp4', 'wav', 'avi', 'mov'};
-
-    if (imageExts.contains(extension)) return 'images';
-    if (docExts.contains(extension)) return 'documents';
-    if (mediaExts.contains(extension)) return 'multimedia';
+    for (var entry in _fileTypeMappings.entries) {
+      if (entry.value.contains(extension)) {
+        return entry.key;
+      }
+    }
     return 'others';
+  }
+
+  void _addExtension(String type, String extension) {
+    setState(() {
+      _fileTypeMappings[type] = {
+        ..._fileTypeMappings[type]!,
+        extension.toLowerCase()
+      };
+    });
+  }
+
+  void _removeExtension(String type, String extension) {
+    setState(() {
+      _fileTypeMappings[type] = _fileTypeMappings[type]!..remove(extension);
+    });
+  }
+
+  void _showAddExtensionDialog(String type) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Add Extension to ${type.toUpperCase()}'),
+        content: TextField(
+          controller: _newExtensionController,
+          decoration: const InputDecoration(
+            hintText: 'Enter file extension (e.g., pdf)',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _newExtensionController.clear();
+            },
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (_newExtensionController.text.isNotEmpty) {
+                _addExtension(type, _newExtensionController.text);
+                Navigator.pop(context);
+                _newExtensionController.clear();
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -221,117 +334,142 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.all(16.0),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('    '),
-              const Text(
-                'File Analysis Tool',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              IconButton(
-                  icon: const Icon(Icons.file_download_outlined),
-                  onPressed: _fileAnalysis.isEmpty
-                      ? null
-                      : () {
-                          final reportData = {
-                            'totalFiles': _totalFiles,
-                            'totalSize': _totalSize,
-                            'suspiciousFiles': <String>[],
-                            'securitySummary': {
-                              'filesWithSensitiveData': <String, dynamic>{},
-                            },
-                            'photoClassifications': Map.fromEntries(
-                              _fileAnalysis.entries
-                                  .where((e) => e.value['photo'] != null)
-                                  .map((e) {
-                                final photo =
-                                    e.value['photo'] as ClassificationResult;
-                                return MapEntry(e.key, {
-                                  'category': photo.category,
-                                  'mlLabels': photo.mlLabels,
-                                  'confidences': photo.confidences,
-                                });
-                              }),
-                            ),
-                            'contentClassifications': Map.fromEntries(
-                              _fileAnalysis.entries
-                                  .where((e) => e.value['content'] != null)
-                                  .map((e) {
-                                final content = e.value['content']
-                                    as ContentClassificationResult;
-                                return MapEntry(e.key, {
-                                  'contentType': content.contentType,
-                                  'confidenceScores': content.confidenceScores,
-                                  'detectedKeywords': content.detectedKeywords,
-                                });
-                              }),
-                            ),
-                            'duplicateDetections': Map.fromEntries(
-                              _fileAnalysis.entries
-                                  .where((e) => e.value['duplicate'] != null)
-                                  .map((e) {
-                                final duplicate = e.value['duplicate']
-                                    as DuplicateDetectionResult;
-                                return MapEntry(e.key, {
-                                  'isDuplicate': duplicate.isDuplicate,
-                                  'similarityScore': duplicate.similarityScore,
-                                  'matchType': duplicate.matchType,
-                                  'matchedWith': duplicate.matchedWith,
-                                });
-                              }),
-                            ),
-                            'autoTags': Map.fromEntries(
-                              _fileAnalysis.entries
-                                  .where((e) => e.value['tags'] != null)
-                                  .map((e) {
-                                final tags =
-                                    e.value['tags'] as AutoTaggingResult;
-                                return MapEntry(e.key, {
-                                  'tags': tags.tags,
-                                  'confidences': tags.confidences,
-                                });
-                              }),
-                            ),
-                          };
-
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ReportGenerationScreen(
-                                reportData: reportData,
-                              ),
-                            ),
-                          );
-                        })
-            ],
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search files...',
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              filled: true,
-              fillColor: Colors.white,
+      child: Column(children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            IconButton(
+              icon: Icon(_isEditingFileTypes ? Icons.done : Icons.settings),
+              onPressed: () {
+                setState(() {
+                  _isEditingFileTypes = !_isEditingFileTypes;
+                });
+              },
             ),
-            onChanged: (value) {
-              setState(() {
-                _searchQuery = value.toLowerCase();
-              });
-            },
+            const Text(
+              'File Analysis Tool',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.history),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ReportHistoryScreen(),
+                      ),
+                    );
+                  },
+                  tooltip: 'Report History',
+                ),
+                IconButton(
+                    icon: const Icon(Icons.file_download_outlined),
+                    onPressed: _fileAnalysis.isEmpty
+                        ? null
+                        : () {
+                            final reportData = {
+                              'totalFiles': _totalFiles,
+                              'totalSize': _totalSize,
+                              'suspiciousFiles': <String>[],
+                              'securitySummary': {
+                                'filesWithSensitiveData': <String, dynamic>{},
+                              },
+                              'photoClassifications': Map.fromEntries(
+                                _fileAnalysis.entries
+                                    .where((e) => e.value['photo'] != null)
+                                    .map((e) {
+                                  final photo =
+                                      e.value['photo'] as ClassificationResult;
+                                  return MapEntry(e.key, {
+                                    'category': photo.category,
+                                    'mlLabels': photo.mlLabels,
+                                    'confidences': photo.confidences,
+                                  });
+                                }),
+                              ),
+                              'contentClassifications': Map.fromEntries(
+                                _fileAnalysis.entries
+                                    .where((e) => e.value['content'] != null)
+                                    .map((e) {
+                                  final content = e.value['content']
+                                      as ContentClassificationResult;
+                                  return MapEntry(e.key, {
+                                    'contentType': content.contentType,
+                                    'confidenceScores':
+                                        content.confidenceScores,
+                                    'detectedKeywords':
+                                        content.detectedKeywords,
+                                  });
+                                }),
+                              ),
+                              'duplicateDetections': Map.fromEntries(
+                                _fileAnalysis.entries
+                                    .where((e) => e.value['duplicate'] != null)
+                                    .map((e) {
+                                  final duplicate = e.value['duplicate']
+                                      as DuplicateDetectionResult;
+                                  return MapEntry(e.key, {
+                                    'isDuplicate': duplicate.isDuplicate,
+                                    'similarityScore':
+                                        duplicate.similarityScore,
+                                    'matchType': duplicate.matchType,
+                                    'matchedWith': duplicate.matchedWith,
+                                  });
+                                }),
+                              ),
+                              'autoTags': Map.fromEntries(
+                                _fileAnalysis.entries
+                                    .where((e) => e.value['tags'] != null)
+                                    .map((e) {
+                                  final tags =
+                                      e.value['tags'] as AutoTaggingResult;
+                                  return MapEntry(e.key, {
+                                    'tags': tags.tags,
+                                    'confidences': tags.confidences,
+                                  });
+                                }),
+                              ),
+                            };
+
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ReportGenerationScreen(
+                                  reportData: reportData,
+                                ),
+                              ),
+                            );
+                          })
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _searchController,
+          decoration: InputDecoration(
+            hintText: 'Search files...',
+            prefixIcon: const Icon(Icons.search),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            filled: true,
+            fillColor: Colors.white,
           ),
-        ],
-      ),
+          onChanged: (value) {
+            setState(() {
+              _searchQuery = value.toLowerCase();
+            });
+          },
+        ),
+      ]),
     );
   }
 
@@ -440,6 +578,10 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Widget _buildFileList() {
+    if (_isEditingFileTypes) {
+      return _buildFileTypeEditor();
+    }
+
     if (_isAnalyzing) {
       return Center(
         child: Column(
@@ -749,10 +891,96 @@ class _MyHomePageState extends State<MyHomePage> {
       case 'multimedia':
         return Icon(Icons.play_circle,
             color: Theme.of(context).colorScheme.primary);
+      case 'code':
+        return Icon(Icons.code, color: Theme.of(context).colorScheme.primary);
+      case 'archives':
+        return Icon(Icons.folder_zip,
+            color: Theme.of(context).colorScheme.primary);
+      case 'spreadsheets':
+        return Icon(Icons.table_chart,
+            color: Theme.of(context).colorScheme.primary);
+      case 'presentations':
+        return Icon(Icons.slideshow,
+            color: Theme.of(context).colorScheme.primary);
+      case 'databases':
+        return Icon(Icons.storage,
+            color: Theme.of(context).colorScheme.primary);
+      case 'fonts':
+        return Icon(Icons.text_fields,
+            color: Theme.of(context).colorScheme.primary);
+      case 'system':
+        return Icon(Icons.settings_applications,
+            color: Theme.of(context).colorScheme.primary);
       default:
         return Icon(Icons.insert_drive_file,
             color: Theme.of(context).colorScheme.primary);
     }
+  }
+
+  Widget _buildFileTypeEditor() {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(16),
+      itemCount: _fileTypeMappings.length,
+      itemBuilder: (context, index) {
+        final type = _fileTypeMappings.keys.elementAt(index);
+        final extensions = _fileTypeMappings[type]!;
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: ExpansionTile(
+            initiallyExpanded: true,
+            leading: _getFileTypeIcon(type),
+            title: Text(
+              type.toUpperCase(),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            subtitle: Text(
+              '${extensions.length} extension${extensions.length == 1 ? '' : 's'}',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: extensions
+                          .map((ext) => Chip(
+                                label: Text(ext),
+                                deleteIcon: const Icon(Icons.close, size: 18),
+                                onDeleted: () => _removeExtension(type, ext),
+                              ))
+                          .toList(),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () => _showAddExtensionDialog(type),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Extension'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override

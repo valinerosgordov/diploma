@@ -6,6 +6,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:ml_practice/models/app_colors.dart';
 import 'package:ml_practice/widgets/expanded_button.dart';
+import 'package:ml_practice/models/report_history.dart';
+import 'package:ml_practice/services/report_history_service.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:path/path.dart' as path;
@@ -32,6 +34,7 @@ class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
   int selectedIndex = 0;
   bool isLoading = false;
   Map<String, dynamic>? _reportData;
+  final ReportHistoryService _historyService = ReportHistoryService();
 
   @override
   void initState() {
@@ -56,7 +59,6 @@ class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
       if (manageStorageStatus.isGranted || storageStatus.isGranted) {
         // We have the necessary permissions, proceed
       } else {
-        // Try requesting manage external storage first (for Android 11+)
         final result = await Permission.manageExternalStorage.request();
         if (!result.isGranted) {
           // Try regular storage permission as fallback
@@ -147,6 +149,17 @@ class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
         // PDF
         await _generatePdfReport(directory.path, filename);
       }
+
+      // Save to report history
+      await _historyService.addReport(
+        ReportHistory(
+          filePath: filePath,
+          fileName: filename,
+          generatedAt: DateTime.now(),
+          fileType: selectedIndex == 0 ? 'xlsx' : 'pdf',
+          totalFiles: _reportData!['totalFiles'],
+        ),
+      );
 
       // Show success dialog with options
       if (!mounted) return;
