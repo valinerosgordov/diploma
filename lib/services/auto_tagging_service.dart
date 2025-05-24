@@ -42,7 +42,7 @@ class AutoTaggingService {
 
       return AutoTaggingResult(
         tags: tags,
-        confidences: confidences,
+        confidences: confidences, //dwad
       );
     } catch (e) {
       print('Error generating tags: $e');
