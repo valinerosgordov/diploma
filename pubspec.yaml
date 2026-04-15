@@ -18,6 +18,7 @@ dependencies:
   image: ^4.1.7
   pie_chart: ^5.4.0
   path: ^1.8.3
+  provider: ^6.1.2
   cupertino_icons: ^1.0.8
   pdf: ^3.11.3
   excel: ^4.0.2

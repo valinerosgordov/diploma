@@ -1,34 +1,39 @@
 import 'package:flutter/material.dart';
 
 abstract class AppColors {
-  // Primary Colors
-  static Color primary = const Color(0xFFE53935); // Red color from design
-  static Color white = const Color(0xFFFFFFFF);
-  static Color black = const Color(0xFF000000);
+  // Primary Accent
+  static const Color primary = Color(0xFFE94F4F);
+  static const Color primaryLight = Color(0xFFFF6B6B);
 
-  // Background Colors
-  static Color background = const Color(0xFFFFF3F3); // Light red background
-  static Color cardBackground = const Color(0xFFFFE8E8);
+  // Backgrounds
+  static const Color background = Color(0xFF0D0D14);
+  static const Color surface = Color(0xFF16161F);
+  static const Color card = Color(0xFF1E1E2A);
+  static const Color cardHover = Color(0xFF262636);
 
-  // Text Colors
-  static Color textPrimary = const Color(0xFF333333);
-  static Color textSecondary = const Color(0xFF666666);
-  static Color textHint = const Color(0xFF999999);
+  // Text
+  static const Color textPrimary = Color(0xFFF0F0F5);
+  static const Color textSecondary = Color(0xFF9CA3AF);
+  static const Color textHint = Color(0xFF6B7280);
 
-  // Status Colors
-  static Color success = const Color(0xFF4CAF50);
-  static Color error = const Color(0xFFE53935);
-  static Color warning = const Color(0xFFFFB800);
+  // Status
+  static const Color success = Color(0xFF34D399);
+  static const Color error = Color(0xFFEF4444);
+  static const Color warning = Color(0xFFFBBF24);
 
   // Input Fields
-  static Color inputBackground = const Color(0xFFF5F5F5);
-  static Color inputBorder = const Color(0xFFE0E0E0);
+  static const Color inputBackground = Color(0xFF1A1A26);
+  static const Color inputBorder = Color(0xFF2D2D3D);
 
-  // Button Colors
-  static Color buttonPrimary = const Color(0xFFE53935);
-  static Color buttonSecondary = const Color(0xFFFFEBEE);
+  // Buttons
+  static const Color buttonPrimary = Color(0xFFE94F4F);
+  static const Color buttonSecondary = Color(0xFF2D2D3D);
 
-  // Divider and Border Colors
-  static Color divider = const Color(0xFFEEEEEE);
-  static Color border = const Color(0xFFE0E0E0);
+  // Divider and Border
+  static const Color divider = Color(0xFF2D2D3D);
+  static const Color border = Color(0xFF363647);
+
+  // Misc
+  static const Color white = Color(0xFFF0F0F5);
+  static const Color black = Color(0xFF000000);
 }

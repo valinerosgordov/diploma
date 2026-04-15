@@ -94,25 +94,35 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Report History'),
+        backgroundColor: AppColors.surface,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
             onPressed: _loadReports,
           ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            )
           : _reports.isEmpty
-              ? const Center(child: Text('No reports found'))
+              ? const Center(
+                  child: Text(
+                    'No reports found',
+                    style: TextStyle(color: AppColors.textHint, fontSize: 16),
+                  ),
+                )
               : ListView.builder(
                   itemCount: _reports.length,
                   padding: const EdgeInsets.all(16),
                   itemBuilder: (context, index) {
                     final report = _reports[index];
                     return Card(
+                      color: AppColors.card,
                       margin: const EdgeInsets.only(bottom: 16),
                       child: ListTile(
                         leading: Icon(
@@ -124,38 +134,55 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
                         ),
                         title: Text(
                           report.fileName,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Generated: ${DateFormat('MMM d, y HH:mm').format(report.generatedAt)}',
+                              style: const TextStyle(
+                                  color: AppColors.textSecondary),
                             ),
-                            Text('Files analyzed: ${report.totalFiles}'),
+                            Text(
+                              'Files analyzed: ${report.totalFiles}',
+                              style: const TextStyle(
+                                  color: AppColors.textSecondary),
+                            ),
                           ],
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.open_in_new),
+                              icon: const Icon(Icons.open_in_new,
+                                  color: AppColors.textSecondary),
                               onPressed: () => _openReport(report),
                               tooltip: 'Open Report',
                             ),
                             IconButton(
-                              icon: const Icon(Icons.delete_outline),
+                              icon: const Icon(Icons.delete_outline,
+                                  color: AppColors.error),
                               onPressed: () => showDialog(
                                 context: context,
                                 builder: (context) => AlertDialog(
                                   title: const Text('Delete Report'),
                                   content: const Text(
                                     'Are you sure you want to delete this report? This action cannot be undone.',
+                                    style: TextStyle(
+                                        color: AppColors.textSecondary),
                                   ),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.pop(context),
-                                      child: const Text('Cancel'),
+                                      child: const Text(
+                                        'Cancel',
+                                        style: TextStyle(
+                                            color: AppColors.textSecondary),
+                                      ),
                                     ),
                                     TextButton(
                                       onPressed: () {
@@ -164,7 +191,8 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
                                       },
                                       child: const Text(
                                         'Delete',
-                                        style: TextStyle(color: Colors.red),
+                                        style:
+                                            TextStyle(color: AppColors.error),
                                       ),
                                     ),
                                   ],

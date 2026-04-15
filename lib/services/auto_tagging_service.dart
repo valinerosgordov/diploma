@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
 
 class AutoTaggingResult {
@@ -42,10 +43,10 @@ class AutoTaggingService {
 
       return AutoTaggingResult(
         tags: tags,
-        confidences: confidences, //dwad
+        confidences: confidences,
       );
     } catch (e) {
-      print('Error generating tags: $e');
+      debugPrint('Error generating tags: $e');
       return AutoTaggingResult(
         tags: [],
         confidences: [],
@@ -58,8 +59,7 @@ class AutoTaggingService {
     return tag.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), '');
   }
 
-  /// Dispose of resources
-  Future<void> dispose() async {
+  void dispose() {
     _labeler.close();
   }
 }

@@ -1,16 +1,12 @@
-// import 'package:diploma/models/app_colors.dart';
-// import 'package:diploma/models/file_info.dart';
-// import 'package:diploma/screens/expanded_button.dart';
-// import 'package:diploma/services/analysis_service.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:ml_practice/models/app_colors.dart';
-import 'package:ml_practice/widgets/expanded_button.dart';
+import 'package:ml_practice/models/report_data.dart';
 import 'package:ml_practice/models/report_history.dart';
 import 'package:ml_practice/services/report_history_service.dart';
+import 'package:ml_practice/widgets/expanded_button.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:cross_file/cross_file.dart';
-import 'package:path/path.dart' as path;
+import 'package:path/path.dart' as p;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:excel/excel.dart' as excel;
@@ -19,12 +15,9 @@ import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
 
 class ReportGenerationScreen extends StatefulWidget {
-  final Map<String, dynamic> reportData;
+  final ReportData reportData;
 
-  const ReportGenerationScreen({
-    super.key,
-    required this.reportData,
-  });
+  const ReportGenerationScreen({super.key, required this.reportData});
 
   @override
   State<ReportGenerationScreen> createState() => _ReportGenerationScreenState();
@@ -33,191 +26,159 @@ class ReportGenerationScreen extends StatefulWidget {
 class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
   int selectedIndex = 0;
   bool isLoading = false;
-  Map<String, dynamic>? _reportData;
   final ReportHistoryService _historyService = ReportHistoryService();
 
-  @override
-  void initState() {
-    super.initState();
-    _reportData = widget.reportData;
+  String get _threatLevel {
+    final duplicates = widget.reportData.duplicateDetections;
+    final hasDuplicates = duplicates.values.any((d) => d.isDuplicate);
+
+    if (hasDuplicates) return 'High';
+    if (widget.reportData.totalFiles > 0) return 'Medium';
+    return 'Low';
   }
 
   Future<void> _generateReport() async {
-    if (_reportData == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No report data available')),
-      );
-      return;
-    }
+    if (!await _requestPermissions()) return;
 
-    // Request storage permissions for Android
-    if (Platform.isAndroid) {
-      // Check if we already have the permissions
-      final manageStorageStatus = await Permission.manageExternalStorage.status;
-      final storageStatus = await Permission.storage.status;
-
-      if (manageStorageStatus.isGranted || storageStatus.isGranted) {
-        // We have the necessary permissions, proceed
-      } else {
-        final result = await Permission.manageExternalStorage.request();
-        if (!result.isGranted) {
-          // Try regular storage permission as fallback
-          final storageResult = await Permission.storage.request();
-          if (!storageResult.isGranted) {
-            // Both permission requests failed, show settings dialog
-            if (!mounted) return;
-            showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('Permission Required'),
-                content: const Text(
-                    'Storage permission is required to save reports. Please enable storage permissions in settings.'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: () async {
-                      Navigator.pop(context);
-                      await openAppSettings();
-                    },
-                    child: const Text('Open Settings'),
-                  ),
-                ],
-              ),
-            );
-            return;
-          }
-        }
-      }
-    }
-
-    setState(() {
-      isLoading = true;
-    });
+    setState(() => isLoading = true);
 
     try {
       final now = DateTime.now();
       final timestamp =
-          "${now.year}${now.month}${now.day}_${now.hour}${now.minute}";
-      final fileType = selectedIndex == 0 ? "xlsx" : "pdf";
-      final filename = 'cyber_threat_report_$timestamp.$fileType';
+          '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}';
+      final fileType = selectedIndex == 0 ? 'xlsx' : 'pdf';
+      final filename = 'file_analysis_report_$timestamp.$fileType';
 
-      // Get the downloads directory
-      Directory? directory;
-      if (Platform.isAndroid) {
-        // Try to get the Downloads directory
-        try {
-          directory = await getExternalStorageDirectory();
-          // Navigate up to get to the root of external storage
-          String newPath = "";
-          List<String> paths = directory!.path.split("/");
-          for (int x = 1; x < paths.length; x++) {
-            String folder = paths[x];
-            if (folder != "Android") {
-              newPath += "/" + folder;
-            } else {
-              break;
-            }
-          }
-          newPath = newPath + "/Download";
-          directory = Directory(newPath);
-        } catch (e) {
-          // Fallback to app's documents directory if external storage is not accessible
-          directory = await getApplicationDocumentsDirectory();
-        }
-      } else {
-        directory = await getApplicationDocumentsDirectory();
-      }
+      final directory = await _getOutputDirectory();
+      if (directory == null) throw Exception('Could not access storage');
 
-      if (directory == null) {
-        throw Exception('Could not access storage directory');
-      }
-
-      // Create directory if it doesn't exist
       if (!await directory.exists()) {
         await directory.create(recursive: true);
       }
 
-      final filePath = path.join(directory.path, filename);
+      final filePath = p.join(directory.path, filename);
 
       if (selectedIndex == 0) {
-        // Excel
         await _generateExcelReport(directory.path, filename);
       } else {
-        // PDF
         await _generatePdfReport(directory.path, filename);
       }
 
-      // Save to report history
       await _historyService.addReport(
         ReportHistory(
           filePath: filePath,
           fileName: filename,
           generatedAt: DateTime.now(),
-          fileType: selectedIndex == 0 ? 'xlsx' : 'pdf',
-          totalFiles: _reportData!['totalFiles'],
+          fileType: fileType,
+          totalFiles: widget.reportData.totalFiles,
         ),
       );
 
-      // Show success dialog with options
       if (!mounted) return;
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Report Generated'),
-          content: Text('Report saved to:\n$filePath'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text('OK'),
-            ),
-            TextButton(
-              onPressed: () async {
-                await Share.shareXFiles([XFile(filePath)],
-                    text: 'Cyber Threat Report');
-                if (!mounted) return;
-                Navigator.pop(context);
-              },
-              child: const Text('Share'),
-            ),
-          ],
-        ),
-      );
+      _showSuccessDialog(filePath);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error generating report: $e')),
-      );
-    } finally {
       if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error generating report: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  Future<bool> _requestPermissions() async {
+    if (!Platform.isAndroid) return true;
+
+    final manageStatus = await Permission.manageExternalStorage.status;
+    final storageStatus = await Permission.storage.status;
+
+    if (manageStatus.isGranted || storageStatus.isGranted) return true;
+
+    final result = await Permission.manageExternalStorage.request();
+    if (result.isGranted) return true;
+
+    final storageResult = await Permission.storage.request();
+    if (storageResult.isGranted) return true;
+
+    if (!mounted) return false;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Permission Required'),
+        content: const Text(
+          'Storage permission is required to save reports. '
+          'Please enable storage permissions in settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await openAppSettings();
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
+    return false;
+  }
+
+  Future<Directory?> _getOutputDirectory() async {
+    if (Platform.isAndroid) {
+      try {
+        final directory = await getExternalStorageDirectory();
+        if (directory == null) return await getApplicationDocumentsDirectory();
+
+        final parts = directory.path.split('/');
+        final buffer = StringBuffer();
+        for (int i = 1; i < parts.length; i++) {
+          if (parts[i] == 'Android') break;
+          buffer.write('/${parts[i]}');
+        }
+        buffer.write('/Download');
+        return Directory(buffer.toString());
+      } catch (_) {
+        return await getApplicationDocumentsDirectory();
       }
     }
+    return await getApplicationDocumentsDirectory();
   }
 
-  String _getThreatLevel() {
-    final suspiciousFiles = _reportData!['suspiciousFiles'] as List;
-    final securitySummary =
-        _reportData!['securitySummary'] as Map<String, dynamic>;
-
-    // Determine threat level based on analysis
-    if (suspiciousFiles.isNotEmpty ||
-        (securitySummary['filesWithSensitiveData'] as Map).isNotEmpty) {
-      return '🚨 High';
-    } else if (_reportData!['totalFiles'] > 0) {
-      return '⚠️ Medium';
-    } else {
-      return '✅ Low';
-    }
+  void _showSuccessDialog(String filePath) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Report Generated'),
+        content: Text('Report saved to:\n$filePath'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await Share.shareXFiles(
+                [XFile(filePath)],
+                text: 'File Analysis Report',
+              );
+              if (!mounted) return;
+              Navigator.pop(context);
+            },
+            child: const Text('Share'),
+          ),
+        ],
+      ),
+    );
   }
+
+  // --- PDF Generation ---
 
   Future<void> _generatePdfReport(String directory, String filename) async {
-    // Use minimal page format
     final pageFormat = PdfPageFormat.a5.copyWith(
       marginLeft: 10,
       marginRight: 10,
@@ -225,303 +186,189 @@ class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
       marginBottom: 10,
     );
 
-    // Use minimal PDF settings
     final pdf = pw.Document(
       compress: true,
       version: PdfVersion.pdf_1_4,
       pageMode: PdfPageMode.none,
     );
 
-    // Enable garbage collection
-    await Future.delayed(const Duration(milliseconds: 100));
-    await Future.microtask(() => null);
-
     final theme = pw.ThemeData.withFont(
       base: pw.Font.helvetica(),
       bold: pw.Font.helveticaBold(),
     );
 
-    // Constants for minimal data processing
-    const int itemsPerPage = 2; // Process minimal items per page
+    const itemsPerPage = 2;
+    final data = widget.reportData;
 
-    // Generate header and summary first
-    pdf.addPage(await _generateHeaderAndSummaryPage(theme, pageFormat));
-
-    // Process photo classifications with optimized data
-    final photoClassifications = _reportData!['photoClassifications'] as Map;
-    final optimizedPhotoData = Map.fromEntries(
-      photoClassifications.entries.map((entry) {
-        final data = entry.value as Map<String, dynamic>;
-        // Take only first 3 ML labels and confidences to reduce data size
-        final mlLabels = (data['mlLabels'] as List).take(3).toList();
-        final confidences = (data['confidences'] as List).take(3).toList();
-        return MapEntry(
-          entry.key.split('/').last, // Use only filename
-          {
-            'category': data['category'],
-            'mlLabels': mlLabels,
-            'confidences': confidences,
-          },
-        );
-      }),
+    // Header + Summary
+    pdf.addPage(
+      pw.MultiPage(
+        theme: theme,
+        pageFormat: pageFormat,
+        margin: const pw.EdgeInsets.all(10),
+        build: (context) => [
+          _pdfHeader(),
+          pw.SizedBox(height: 10),
+          _pdfSection('1. Report Header', [
+            _infoRow('Incident Name', 'File Analysis Report'),
+            _infoRow('Date & Time', DateTime.now().toUtc().toString()),
+            _infoRow('Analyst Name', 'System Generated'),
+            _infoRow('Threat Level', _threatLevel, isHighlight: true),
+          ]),
+          pw.SizedBox(height: 10),
+          _pdfSection('2. Summary', [
+            _infoRow('Total Files', '${data.totalFiles} files'),
+            _infoRow('Photo Classifications',
+                '${data.photoClassifications.length} images'),
+            _infoRow('Content Classifications',
+                '${data.contentClassifications.length} files'),
+            _infoRow('Duplicate Detections',
+                '${data.duplicateDetections.length} comparisons'),
+            _infoRow(
+                'Auto-Tagged', '${data.autoTags.length} files'),
+          ]),
+        ],
+      ),
     );
 
-    await _processDataInChunks(
+    // Photo Classifications
+    _addChunkedSection(
       pdf: pdf,
       theme: theme,
-      data: optimizedPhotoData,
-      sectionTitle: '3. Photo Classifications',
-      sectionSubtitle: 'Photo Analysis Results',
-      backgroundColor: PdfColors.green50,
-      textColor: PdfColors.green900,
+      pageFormat: pageFormat,
+      title: '3. Photo Classifications',
+      entries: data.photoClassifications.entries.toList(),
       itemsPerPage: itemsPerPage,
-      processItem: (entry) => [
-        _buildInfoRow('File', entry.key),
-        _buildInfoRow('Category', (entry.value as Map)['category']),
-        _buildInfoRow(
-            'ML Labels', ((entry.value as Map)['mlLabels'] as List).join(', ')),
-        _buildInfoRow(
+      buildItem: (entry) => [
+        _infoRow('File', p.basename(entry.key)),
+        _infoRow('Category', entry.value.category),
+        _infoRow('ML Labels', entry.value.mlLabels.take(3).join(', ')),
+        _infoRow(
           'Confidences',
-          ((entry.value as Map)['confidences'] as List)
-              .map((c) => (c * 100).toStringAsFixed(1) + '%')
+          entry.value.confidences
+              .take(3)
+              .map((c) => '${(c * 100).toStringAsFixed(1)}%')
               .join(', '),
         ),
         pw.SizedBox(height: 8),
       ],
     );
 
-    // Clear memory
-    optimizedPhotoData.clear();
-    await Future.delayed(const Duration(milliseconds: 200));
-
-    // Process content classifications with optimized data
-    final contentClassifications =
-        _reportData!['contentClassifications'] as Map;
-    final optimizedContentData = Map.fromEntries(
-      contentClassifications.entries.map((entry) {
-        final data = entry.value as Map<String, dynamic>;
-        // Take only first 5 keywords to reduce data size
-        final keywords = (data['detectedKeywords'] as List).take(5).toList();
-        return MapEntry(
-          entry.key.split('/').last, // Use only filename
-          {
-            'contentType': data['contentType'],
-            'detectedKeywords': keywords,
-          },
-        );
-      }),
-    );
-
-    await _processDataInChunks(
+    // Content Classifications
+    _addChunkedSection(
       pdf: pdf,
       theme: theme,
-      data: optimizedContentData,
-      sectionTitle: '4. Content Classifications',
-      sectionSubtitle: 'Content Analysis Results',
-      backgroundColor: PdfColors.blue50,
-      textColor: PdfColors.blue900,
+      pageFormat: pageFormat,
+      title: '4. Content Classifications',
+      entries: data.contentClassifications.entries.toList(),
       itemsPerPage: itemsPerPage,
-      processItem: (entry) => [
-        _buildInfoRow('File', entry.key),
-        _buildInfoRow('Content Type', (entry.value as Map)['contentType']),
-        _buildInfoRow('Keywords',
-            ((entry.value as Map)['detectedKeywords'] as List).join(', ')),
+      buildItem: (entry) => [
+        _infoRow('File', p.basename(entry.key)),
+        _infoRow('Content Type', entry.value.contentType),
+        _infoRow(
+            'Keywords', entry.value.detectedKeywords.take(5).join(', ')),
         pw.SizedBox(height: 8),
       ],
     );
 
-    // Clear memory
-    optimizedContentData.clear();
-    await Future.delayed(const Duration(milliseconds: 200));
-
-    // Process duplicate detections with optimized data
-    final duplicateDetections = _reportData!['duplicateDetections'] as Map;
-    final optimizedDuplicateData = Map.fromEntries(
-      duplicateDetections.entries.map((entry) {
-        final data = entry.value as Map<String, dynamic>;
-        return MapEntry(
-          entry.key.split('/').last, // Use only filename
-          {
-            'isDuplicate': data['isDuplicate'],
-            'matchedWith':
-                data['isDuplicate'] ? (data['matchedWith'] ?? 'N/A') : 'N/A',
-            'similarityScore': data['similarityScore'],
-            'matchType': data['matchType'],
-          },
-        );
-      }),
-    );
-    await _processDataInChunks(
+    // Duplicate Detections
+    _addChunkedSection(
       pdf: pdf,
       theme: theme,
-      data: duplicateDetections,
-      sectionTitle: '5. Duplicate Detections',
-      sectionSubtitle: 'Duplicate Analysis Results',
-      backgroundColor: PdfColors.orange50,
-      textColor: PdfColors.orange900,
+      pageFormat: pageFormat,
+      title: '5. Duplicate Detections',
+      entries: data.duplicateDetections.entries.toList(),
       itemsPerPage: itemsPerPage,
-      processItem: (entry) {
-        final data = entry.value as Map<String, dynamic>;
-        return [
-          _buildInfoRow('File', entry.key),
-          _buildInfoRow('Is Duplicate', data['isDuplicate'].toString()),
-          if (data['isDuplicate'])
-            _buildInfoRow('Matched With', data['matchedWith'] ?? 'N/A'),
-          _buildInfoRow('Similarity Score',
-              '${(data['similarityScore'] * 100).toStringAsFixed(1)}%'),
-          _buildInfoRow('Match Type', data['matchType']),
-          pw.SizedBox(height: 8),
-        ];
-      },
+      buildItem: (entry) => [
+        _infoRow('File', p.basename(entry.key)),
+        _infoRow('Is Duplicate', entry.value.isDuplicate.toString()),
+        if (entry.value.isDuplicate)
+          _infoRow('Matched With', entry.value.matchedWith ?? 'N/A'),
+        _infoRow('Similarity',
+            '${(entry.value.similarityScore * 100).toStringAsFixed(1)}%'),
+        _infoRow('Match Type', entry.value.matchType.toString()),
+        pw.SizedBox(height: 8),
+      ],
     );
 
-    // Process auto tags in chunks
-    final autoTags = _reportData!['autoTags'] as Map;
-    await _processDataInChunks(
+    // Auto Tags
+    _addChunkedSection(
       pdf: pdf,
       theme: theme,
-      data: autoTags,
-      sectionTitle: '6. Auto Tags',
-      sectionSubtitle: 'Auto Tagging Results',
-      backgroundColor: PdfColors.purple50,
-      textColor: PdfColors.purple900,
+      pageFormat: pageFormat,
+      title: '6. Auto Tags',
+      entries: data.autoTags.entries.toList(),
       itemsPerPage: itemsPerPage,
-      processItem: (entry) {
-        final data = entry.value as Map<String, dynamic>;
-        return [
-          _buildInfoRow('File', entry.key),
-          _buildInfoRow('Tags', (data['tags'] as List).join(', ')),
-          _buildInfoRow(
-            'Confidences',
-            (data['confidences'] as List)
-                .map((c) => (c * 100).toStringAsFixed(1) + '%')
-                .join(', '),
-          ),
-          pw.SizedBox(height: 8),
-        ];
-      },
-    );
-
-    // Add performance metrics page
-    pdf.addPage(await _generatePerformanceMetricsPage(theme, pageFormat));
-
-    try {
-      // Save with optimized memory usage
-      final file = File('$directory/$filename');
-      final bytes = await pdf.save();
-
-      // Use buffered write with smaller chunks
-      final stream = file.openWrite(mode: FileMode.write);
-      const chunkSize = 512 * 1024; // 512KB chunks for better memory management
-
-      for (var i = 0; i < bytes.length; i += chunkSize) {
-        final end =
-            (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;
-        stream.add(bytes.sublist(i, end));
-        // More frequent GC opportunities
-        await Future.delayed(const Duration(milliseconds: 100));
-        await Future.microtask(() => null);
-      }
-
-      await stream.flush();
-      await stream.close();
-    } catch (e) {
-      print('Error saving PDF: $e');
-      rethrow;
-    }
-  }
-
-  Future<pw.Page> _generateHeaderAndSummaryPage(
-      pw.ThemeData theme, PdfPageFormat pageFormat) async {
-    return pw.MultiPage(
-      theme: theme,
-      pageFormat: pageFormat,
-      margin: const pw.EdgeInsets.all(10),
-      build: (context) => [
-        _buildPdfHeader(),
-        pw.SizedBox(height: 10),
-        _buildPdfSection('1. Report Header', [
-          _buildInfoRow('Incident Name', 'File Analysis Report'),
-          _buildInfoRow('Date & Time', DateTime.now().toUtc().toString()),
-          _buildInfoRow('Analyst Name', 'System Generated'),
-          _buildInfoRow('Threat Level', _getThreatLevel(), isHighlight: true),
-        ]),
-        pw.SizedBox(height: 10),
-        _buildPdfSection('2. Summary of Findings', [_buildPdfSummarySection()]),
+      buildItem: (entry) => [
+        _infoRow('File', p.basename(entry.key)),
+        _infoRow('Tags', entry.value.tags.join(', ')),
+        _infoRow(
+          'Confidences',
+          entry.value.confidences
+              .map((c) => '${(c * 100).toStringAsFixed(1)}%')
+              .join(', '),
+        ),
+        pw.SizedBox(height: 8),
       ],
     );
-  }
 
-  Future<pw.Page> _generatePerformanceMetricsPage(
-      pw.ThemeData theme, PdfPageFormat pageFormat) async {
-    return pw.MultiPage(
-      theme: theme,
-      pageFormat: pageFormat,
-      margin: const pw.EdgeInsets.all(10),
-      build: (context) => [
-        _buildPdfSection('7. ML Model Performance', [
-          _buildPdfNetworkAnalysisSection(),
-        ]),
-      ],
+    // Performance Metrics
+    pdf.addPage(
+      pw.MultiPage(
+        theme: theme,
+        pageFormat: pageFormat,
+        margin: const pw.EdgeInsets.all(10),
+        build: (context) => [
+          _pdfSection('7. ML Model Performance', [
+            _infoRow(
+              'Avg Confidence (Photo)',
+              '${_avgConfidence(data.photoClassifications.values.expand((r) => r.confidences))}%',
+            ),
+            _infoRow(
+              'Avg Confidence (Tags)',
+              '${_avgConfidence(data.autoTags.values.expand((r) => r.confidences))}%',
+            ),
+            _infoRow(
+              'Duplicate Detection Rate',
+              '${_duplicateRate()}%',
+            ),
+          ]),
+        ],
+      ),
     );
+
+    // Save
+    final file = File('$directory/$filename');
+    final bytes = await pdf.save();
+    await file.writeAsBytes(bytes);
   }
 
-  Future<void> _processDataInChunks({
+  void _addChunkedSection<T>({
     required pw.Document pdf,
     required pw.ThemeData theme,
-    required Map data,
-    required String sectionTitle,
-    required String sectionSubtitle,
-    required PdfColor backgroundColor,
-    required PdfColor textColor,
+    required PdfPageFormat pageFormat,
+    required String title,
+    required List<T> entries,
     required int itemsPerPage,
-    required List<pw.Widget> Function(MapEntry) processItem,
-  }) async {
-    final entries = data.entries.toList();
-
-    // Process in smaller chunks with memory cleanup
+    required List<pw.Widget> Function(T) buildItem,
+  }) {
     for (var i = 0; i < entries.length; i += itemsPerPage) {
-      // More aggressive memory cleanup
-      await Future.delayed(const Duration(milliseconds: 200));
-      // Force garbage collection
-      await Future.microtask(() => null);
-
-      final chunk = entries.skip(i).take(itemsPerPage).toList();
-      final widgets = chunk.expand(processItem).toList();
-
-      // Use minimal page format
-      final pageFormat = PdfPageFormat.a5.copyWith(
-        marginLeft: 10,
-        marginRight: 10,
-        marginTop: 10,
-        marginBottom: 10,
-      );
+      final chunk = entries.skip(i).take(itemsPerPage);
+      final widgets = chunk.expand(buildItem).toList();
 
       pdf.addPage(
         pw.MultiPage(
           theme: theme,
           pageFormat: pageFormat,
           margin: const pw.EdgeInsets.all(10),
-          maxPages: 1, // Limit pages per chunk
-          build: (context) => [
-            _buildPdfSection(sectionTitle, [
-              _buildModelResultSection(
-                sectionSubtitle,
-                backgroundColor,
-                textColor,
-                widgets,
-              ),
-            ]),
-          ],
+          maxPages: 1,
+          build: (context) => [_pdfSection(title, widgets)],
         ),
       );
-
-      // Add a small delay to allow memory cleanup
-      await Future.delayed(const Duration(milliseconds: 100));
     }
   }
 
-  pw.Widget _buildPdfHeader() {
+  pw.Widget _pdfHeader() {
     return pw.Container(
       padding: const pw.EdgeInsets.all(16),
       decoration: pw.BoxDecoration(
@@ -530,10 +377,10 @@ class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
       ),
       child: pw.Center(
         child: pw.Text(
-          'Cyber Threat Report',
+          'File Analysis Report',
           style: pw.TextStyle(
             color: PdfColors.white,
-            fontSize: 20, // Reduced from 28
+            fontSize: 20,
             fontWeight: pw.FontWeight.bold,
           ),
         ),
@@ -541,7 +388,7 @@ class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
     );
   }
 
-  pw.Widget _buildPdfSection(String title, List<pw.Widget> children) {
+  pw.Widget _pdfSection(String title, List<pw.Widget> children) {
     return pw.Container(
       padding: const pw.EdgeInsets.all(8),
       child: pw.Column(
@@ -557,7 +404,7 @@ class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
             child: pw.Text(
               title,
               style: pw.TextStyle(
-                fontSize: 14, // Reduced from 18
+                fontSize: 14,
                 fontWeight: pw.FontWeight.bold,
                 color: PdfColors.blue700,
               ),
@@ -570,14 +417,13 @@ class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
     );
   }
 
-  pw.Widget _buildInfoRow(String label, String value,
-      {bool isHighlight = false}) {
+  pw.Widget _infoRow(String label, String value, {bool isHighlight = false}) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 4),
       child: pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Container(
+          pw.SizedBox(
             width: 120,
             child: pw.Text(
               label,
@@ -601,608 +447,315 @@ class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
     );
   }
 
-  pw.Widget _buildPdfSummarySection() {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        _buildInfoRow(
-            'Total Files Analyzed', '${_reportData!['totalFiles']} files'),
-        _buildInfoRow('Processing Date', DateTime.now().toString()),
-        pw.SizedBox(height: 20),
-
-        // ML Model Results Summary
-        pw.Container(
-          padding: const pw.EdgeInsets.all(8),
-          decoration: pw.BoxDecoration(
-            color: PdfColors.blue50,
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-          ),
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text(
-                'ML Model Analysis Summary',
-                style: pw.TextStyle(
-                  fontSize: 12, // Reduced from 16
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColors.blue900,
-                ),
-              ),
-              pw.SizedBox(height: 8),
-              _buildInfoRow('Photo Classifications',
-                  '${(_reportData!['photoClassifications'] as Map).length} images processed'),
-              _buildInfoRow('Content Classifications',
-                  '${(_reportData!['contentClassifications'] as Map).length} files analyzed'),
-              _buildInfoRow('Duplicate Detections',
-                  '${(_reportData!['duplicateDetections'] as Map).length} comparisons made'),
-              _buildInfoRow('Auto-Tagged Files',
-                  '${(_reportData!['autoTags'] as Map).length} files tagged'),
-            ],
-          ),
-        ),
-      ],
-    );
+  String _avgConfidence(Iterable<double> confidences) {
+    final list = confidences.toList();
+    if (list.isEmpty) return '0.0';
+    final avg = list.reduce((a, b) => a + b) / list.length;
+    return (avg * 100).toStringAsFixed(1);
   }
 
-  pw.Widget _buildPdfFileAnalysisSection() {
-    final photoClassifications = _reportData!['photoClassifications'] as Map;
-    final contentClassifications =
-        _reportData!['contentClassifications'] as Map;
-    final duplicateDetections = _reportData!['duplicateDetections'] as Map;
-    final autoTags = _reportData!['autoTags'] as Map;
-
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        // Photo Classifications
-        _buildModelResultSection(
-          'Photo Classifications',
-          PdfColors.green50,
-          PdfColors.green900,
-          photoClassifications.entries
-              .map((e) {
-                final data = e.value as Map<String, dynamic>;
-                return [
-                  _buildInfoRow('File', e.key),
-                  _buildInfoRow('Category', data['category']),
-                  _buildInfoRow(
-                      'ML Labels', (data['mlLabels'] as List).join(', ')),
-                  _buildInfoRow(
-                      'Confidences',
-                      (data['confidences'] as List)
-                          .map((c) => (c * 100).toStringAsFixed(1) + '%')
-                          .join(', ')),
-                  pw.SizedBox(height: 8),
-                ];
-              })
-              .expand((x) => x)
-              .toList(),
-        ),
-        pw.SizedBox(height: 20),
-
-        // Content Classifications
-        _buildModelResultSection(
-          'Content Classifications',
-          PdfColors.blue50,
-          PdfColors.blue900,
-          contentClassifications.entries
-              .map((e) {
-                final data = e.value as Map<String, dynamic>;
-                return [
-                  _buildInfoRow('File', e.key),
-                  _buildInfoRow('Content Type', data['contentType']),
-                  _buildInfoRow('Keywords',
-                      (data['detectedKeywords'] as List).join(', ')),
-                  pw.SizedBox(height: 8),
-                ];
-              })
-              .expand((x) => x)
-              .toList(),
-        ),
-        pw.SizedBox(height: 20),
-
-        // Duplicate Detections
-        _buildModelResultSection(
-          'Duplicate Detections',
-          PdfColors.orange50,
-          PdfColors.orange900,
-          duplicateDetections.entries
-              .map((e) {
-                final data = e.value as Map<String, dynamic>;
-                return [
-                  _buildInfoRow('File', e.key),
-                  _buildInfoRow('Is Duplicate', data['isDuplicate'].toString()),
-                  if (data['isDuplicate'])
-                    _buildInfoRow('Matched With', data['matchedWith'] ?? 'N/A'),
-                  _buildInfoRow('Similarity Score',
-                      '${(data['similarityScore'] * 100).toStringAsFixed(1)}%'),
-                  _buildInfoRow('Match Type', data['matchType']),
-                  pw.SizedBox(height: 8),
-                ];
-              })
-              .expand((x) => x)
-              .toList(),
-        ),
-        pw.SizedBox(height: 20),
-
-        // Auto Tags
-        _buildModelResultSection(
-          'Auto Tags',
-          PdfColors.purple50,
-          PdfColors.purple900,
-          autoTags.entries
-              .map((e) {
-                final data = e.value as Map<String, dynamic>;
-                return [
-                  _buildInfoRow('File', e.key),
-                  _buildInfoRow('Tags', (data['tags'] as List).join(', ')),
-                  _buildInfoRow(
-                      'Confidences',
-                      (data['confidences'] as List)
-                          .map((c) => (c * 100).toStringAsFixed(1) + '%')
-                          .join(', ')),
-                  pw.SizedBox(height: 8),
-                ];
-              })
-              .expand((x) => x)
-              .toList(),
-        ),
-      ],
-    );
-  }
-
-  pw.Widget _buildStatRow(String label, String value) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(vertical: 2),
-      child: pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-        children: [
-          pw.Text(label),
-          pw.Text(
-            value,
-            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-          ),
-        ],
-      ),
-    );
-  }
-
-  pw.Widget _buildPdfNetworkAnalysisSection() {
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(12),
-      decoration: pw.BoxDecoration(
-        color: PdfColors.grey100,
-        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-      ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(
-            'ML Model Performance',
-            style: pw.TextStyle(
-              fontSize: 14,
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.grey800,
-            ),
-          ),
-          pw.SizedBox(height: 12),
-          _buildInfoRow('Average Confidence (Photo Classification)',
-              '${_calculateAverageConfidence(_reportData!['photoClassifications'])}%'),
-          _buildInfoRow('Average Confidence (Auto Tagging)',
-              '${_calculateAverageConfidence(_reportData!['autoTags'])}%'),
-          _buildInfoRow('Duplicate Detection Accuracy',
-              '${_calculateDuplicateDetectionAccuracy()}%'),
-        ],
-      ),
-    );
-  }
-
-  String _calculateAverageConfidence(Map data) {
-    if (data.isEmpty) return '0.0';
-    double totalConfidence = 0.0;
-    int count = 0;
-
-    data.forEach((_, value) {
-      final confidences =
-          (value as Map<String, dynamic>)['confidences'] as List;
-      totalConfidence +=
-          confidences.fold(0.0, (sum, conf) => sum + (conf as num));
-      count += confidences.length;
-    });
-
-    return count > 0
-        ? (totalConfidence / count * 100).toStringAsFixed(1)
-        : '0.0';
-  }
-
-  String _calculateDuplicateDetectionAccuracy() {
-    final duplicates = _reportData!['duplicateDetections'] as Map;
+  String _duplicateRate() {
+    final duplicates = widget.reportData.duplicateDetections;
     if (duplicates.isEmpty) return '0.0';
 
-    int correctDetections = 0;
-    duplicates.forEach((_, value) {
-      final data = value as Map<String, dynamic>;
-      if (data['isDuplicate'] && data['similarityScore'] > 0.8) {
-        correctDetections++;
-      }
-    });
-
-    return (correctDetections / duplicates.length * 100).toStringAsFixed(1);
+    final detected =
+        duplicates.values.where((d) => d.isDuplicate).length;
+    return (detected / duplicates.length * 100).toStringAsFixed(1);
   }
 
-  pw.Widget _buildModelResultSection(
-    String title,
-    PdfColor backgroundColor,
-    PdfColor textColor,
-    List<pw.Widget> content,
-  ) {
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(12),
-      decoration: pw.BoxDecoration(
-        color: backgroundColor,
-        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-      ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(
-            title,
-            style: pw.TextStyle(
-              fontSize: 14,
-              fontWeight: pw.FontWeight.bold,
-              color: textColor,
-            ),
-          ),
-          pw.SizedBox(height: 12),
-          ...content,
-        ],
-      ),
-    );
-  }
+  // --- Excel Generation ---
 
   Future<void> _generateExcelReport(String directory, String filename) async {
     final workbook = excel.Excel.createExcel();
+    final data = widget.reportData;
 
     // Summary Sheet
-    final summarySheet = workbook['Summary'];
-    _addExcelHeader(summarySheet);
-    _addExcelSummary(summarySheet);
+    final summary = workbook['Summary'];
+    _excelHeader(summary);
+    _excelSummary(summary, data);
 
     // File Analysis Sheet
-    final analysisSheet = workbook['File Analysis'];
-    _addFileAnalysis(analysisSheet);
+    final analysis = workbook['File Analysis'];
+    _excelFileAnalysis(analysis, data);
 
-    // Network Analysis Sheet
-    final networkSheet = workbook['Network Analysis'];
-    _addNetworkAnalysis(networkSheet);
+    // Performance Sheet
+    final perf = workbook['Performance'];
+    _excelPerformance(perf, data);
 
     final file = File('$directory/$filename');
     await file.writeAsBytes(workbook.encode()!);
   }
 
-  void _addExcelHeader(excel.Sheet sheet) {
-    // Title
-    final titleCell = sheet.cell(excel.CellIndex.indexByString("A1"));
-    titleCell.value = excel.TextCellValue("Cyber Threat Report");
-    titleCell.cellStyle = excel.CellStyle(
-      bold: true,
-      fontSize: 16,
+  void _excelHeader(excel.Sheet sheet) {
+    final titleCell = sheet.cell(excel.CellIndex.indexByString('A1'));
+    titleCell.value = excel.TextCellValue('File Analysis Report');
+    titleCell.cellStyle = excel.CellStyle(bold: true, fontSize: 16);
+    sheet.merge(
+      excel.CellIndex.indexByString('A1'),
+      excel.CellIndex.indexByString('C1'),
     );
-    sheet.merge(excel.CellIndex.indexByString("A1"),
-        excel.CellIndex.indexByString("C1"));
 
-    // Header info with styling
     final headers = [
-      ["Incident Name", "Suspicious Email Phishing Attempt"],
-      ["Date & Time", DateTime.now().toUtc().toString()],
-      ["Analyst Name", "System Generated"],
-      ["Threat Level", _getThreatLevel()],
+      ['Incident Name', 'File Analysis Report'],
+      ['Date & Time', DateTime.now().toUtc().toString()],
+      ['Analyst Name', 'System Generated'],
+      ['Threat Level', _threatLevel],
     ];
 
-    int row = 3;
-    for (var header in headers) {
-      final labelCell = sheet.cell(excel.CellIndex.indexByString("A$row"));
-      final valueCell = sheet.cell(excel.CellIndex.indexByString("B$row"));
-
-      labelCell.value = excel.TextCellValue(header[0]);
-      valueCell.value = excel.TextCellValue(header[1]);
-
-      labelCell.cellStyle = excel.CellStyle(
-        bold: true,
-      );
-
-      if (header[0] == "Threat Level") {
-        valueCell.cellStyle = excel.CellStyle(
-          bold: true,
-        );
-      }
-
-      row++;
+    for (var i = 0; i < headers.length; i++) {
+      final row = i + 3;
+      final label = sheet.cell(excel.CellIndex.indexByString('A$row'));
+      final value = sheet.cell(excel.CellIndex.indexByString('B$row'));
+      label.value = excel.TextCellValue(headers[i][0]);
+      value.value = excel.TextCellValue(headers[i][1]);
+      label.cellStyle = excel.CellStyle(bold: true);
     }
   }
 
-  void _addExcelSummary(excel.Sheet sheet) {
-    int row = 7;
-
-    // Section header
-    final headerCell = sheet.cell(excel.CellIndex.indexByString("A$row"));
-    headerCell.value = excel.TextCellValue("ML Analysis Summary");
-    headerCell.cellStyle = excel.CellStyle(
-      bold: true,
-      fontSize: 14,
-    );
-    sheet.merge(excel.CellIndex.indexByString("A$row"),
-        excel.CellIndex.indexByString("C$row"));
+  void _excelSummary(excel.Sheet sheet, ReportData data) {
+    int row = 8;
+    final header = sheet.cell(excel.CellIndex.indexByString('A$row'));
+    header.value = excel.TextCellValue('ML Analysis Summary');
+    header.cellStyle = excel.CellStyle(bold: true, fontSize: 14);
     row += 2;
 
-    // Summary data
     final summaryData = [
-      ["Total Files Analyzed", _reportData!['totalFiles'].toString()],
-      [
-        "Photo Classifications",
-        "${(_reportData!['photoClassifications'] as Map).length} images"
-      ],
-      [
-        "Content Classifications",
-        "${(_reportData!['contentClassifications'] as Map).length} files"
-      ],
-      [
-        "Duplicate Detections",
-        "${(_reportData!['duplicateDetections'] as Map).length} comparisons"
-      ],
-      [
-        "Auto-Tagged Files",
-        "${(_reportData!['autoTags'] as Map).length} files"
-      ],
+      ['Total Files Analyzed', '${data.totalFiles}'],
+      ['Photo Classifications', '${data.photoClassifications.length} images'],
+      ['Content Classifications', '${data.contentClassifications.length} files'],
+      ['Duplicate Detections', '${data.duplicateDetections.length} comparisons'],
+      ['Auto-Tagged Files', '${data.autoTags.length} files'],
     ];
 
-    for (var data in summaryData) {
-      final labelCell = sheet.cell(excel.CellIndex.indexByString("A$row"));
-      final valueCell = sheet.cell(excel.CellIndex.indexByString("B$row"));
-
-      labelCell.value = excel.TextCellValue(data[0]);
-      valueCell.value = excel.TextCellValue(data[1]);
-
-      labelCell.cellStyle = excel.CellStyle(
-        bold: true,
-      );
-
+    for (final item in summaryData) {
+      final label = sheet.cell(excel.CellIndex.indexByString('A$row'));
+      final value = sheet.cell(excel.CellIndex.indexByString('B$row'));
+      label.value = excel.TextCellValue(item[0]);
+      value.value = excel.TextCellValue(item[1]);
+      label.cellStyle = excel.CellStyle(bold: true);
       row++;
     }
   }
 
-  void _addNetworkAnalysis(excel.Sheet sheet) {
+  void _excelFileAnalysis(excel.Sheet sheet, ReportData data) {
     int row = 1;
-
-    // Section header
-    final headerCell = sheet.cell(excel.CellIndex.indexByString("A$row"));
-    headerCell.value = excel.TextCellValue("ML Model Performance");
-    headerCell.cellStyle = excel.CellStyle(
-      bold: true,
-      fontSize: 14,
-    );
-    sheet.merge(excel.CellIndex.indexByString("A$row"),
-        excel.CellIndex.indexByString("C$row"));
-    row += 2;
-
-    // Performance metrics
-    final metrics = [
-      [
-        "Average Confidence (Photo Classification)",
-        "${_calculateAverageConfidence(_reportData!['photoClassifications'])}%"
-      ],
-      [
-        "Average Confidence (Auto Tagging)",
-        "${_calculateAverageConfidence(_reportData!['autoTags'])}%"
-      ],
-      [
-        "Duplicate Detection Accuracy",
-        "${_calculateDuplicateDetectionAccuracy()}%"
-      ],
-    ];
-
-    for (var metric in metrics) {
-      final labelCell = sheet.cell(excel.CellIndex.indexByString("A$row"));
-      final valueCell = sheet.cell(excel.CellIndex.indexByString("B$row"));
-
-      labelCell.value = excel.TextCellValue(metric[0]);
-      valueCell.value = excel.TextCellValue(metric[1]);
-
-      labelCell.cellStyle = excel.CellStyle(
-        bold: true,
-      );
-
-      row++;
-    }
-  }
-
-  void _addFileAnalysis(excel.Sheet sheet) {
-    int row = 1;
-    final photoClassifications = _reportData!['photoClassifications'] as Map;
-    final contentClassifications =
-        _reportData!['contentClassifications'] as Map;
-    final duplicateDetections = _reportData!['duplicateDetections'] as Map;
-    final autoTags = _reportData!['autoTags'] as Map;
 
     // Photo Classifications
-    row = _addExcelSection(sheet, row, "Photo Classifications", [
-      ["File", "Category", "ML Labels", "Confidences"],
-      ...photoClassifications.entries.map((e) {
-        final data = e.value as Map<String, dynamic>;
-        return [
-          e.key,
-          data['category'],
-          (data['mlLabels'] as List).join(', '),
-          (data['confidences'] as List)
-              .map((c) => (c * 100).toStringAsFixed(1) + '%')
-              .join(', '),
-        ];
-      }),
+    row = _addExcelSection(sheet, row, 'Photo Classifications', [
+      ['File', 'Category', 'ML Labels', 'Confidences'],
+      ...data.photoClassifications.entries.map((e) => [
+            p.basename(e.key),
+            e.value.category,
+            e.value.mlLabels.join(', '),
+            e.value.confidences
+                .map((c) => '${(c * 100).toStringAsFixed(1)}%')
+                .join(', '),
+          ]),
     ]);
-
     row += 2;
 
     // Content Classifications
-    row = _addExcelSection(sheet, row, "Content Classifications", [
-      ["File", "Content Type", "Keywords"],
-      ...contentClassifications.entries.map((e) {
-        final data = e.value as Map<String, dynamic>;
-        return [
-          e.key,
-          data['contentType'],
-          (data['detectedKeywords'] as List).join(', '),
-        ];
-      }),
+    row = _addExcelSection(sheet, row, 'Content Classifications', [
+      ['File', 'Content Type', 'Keywords'],
+      ...data.contentClassifications.entries.map((e) => [
+            p.basename(e.key),
+            e.value.contentType,
+            e.value.detectedKeywords.join(', '),
+          ]),
     ]);
-
     row += 2;
 
     // Duplicate Detections
-    row = _addExcelSection(sheet, row, "Duplicate Detections", [
-      [
-        "File",
-        "Is Duplicate",
-        "Matched With",
-        "Similarity Score",
-        "Match Type"
-      ],
-      ...duplicateDetections.entries.map((e) {
-        final data = e.value as Map<String, dynamic>;
-        return [
-          e.key,
-          data['isDuplicate'].toString(),
-          data['isDuplicate'] ? (data['matchedWith'] ?? 'N/A') : 'N/A',
-          '${(data['similarityScore'] * 100).toStringAsFixed(1)}%',
-          data['matchType'],
-        ];
-      }),
+    row = _addExcelSection(sheet, row, 'Duplicate Detections', [
+      ['File', 'Is Duplicate', 'Matched With', 'Similarity', 'Match Type'],
+      ...data.duplicateDetections.entries.map((e) => [
+            p.basename(e.key),
+            e.value.isDuplicate.toString(),
+            e.value.isDuplicate ? (e.value.matchedWith ?? 'N/A') : 'N/A',
+            '${(e.value.similarityScore * 100).toStringAsFixed(1)}%',
+            e.value.matchType,
+          ]),
     ]);
-
     row += 2;
 
     // Auto Tags
-    row = _addExcelSection(sheet, row, "Auto Tags", [
-      ["File", "Tags", "Confidences"],
-      ...autoTags.entries.map((e) {
-        final data = e.value as Map<String, dynamic>;
-        return [
-          e.key,
-          (data['tags'] as List).join(', '),
-          (data['confidences'] as List)
-              .map((c) => (c * 100).toStringAsFixed(1) + '%')
-              .join(', '),
-        ];
-      }),
+    _addExcelSection(sheet, row, 'Auto Tags', [
+      ['File', 'Tags', 'Confidences'],
+      ...data.autoTags.entries.map((e) => [
+            p.basename(e.key),
+            e.value.tags.join(', '),
+            e.value.confidences
+                .map((c) => '${(c * 100).toStringAsFixed(1)}%')
+                .join(', '),
+          ]),
     ]);
   }
 
+  void _excelPerformance(excel.Sheet sheet, ReportData data) {
+    int row = 1;
+    final header = sheet.cell(excel.CellIndex.indexByString('A$row'));
+    header.value = excel.TextCellValue('ML Model Performance');
+    header.cellStyle = excel.CellStyle(bold: true, fontSize: 14);
+    row += 2;
+
+    final metrics = [
+      [
+        'Average Confidence (Photo)',
+        '${_avgConfidence(data.photoClassifications.values.expand((r) => r.confidences))}%',
+      ],
+      [
+        'Average Confidence (Tags)',
+        '${_avgConfidence(data.autoTags.values.expand((r) => r.confidences))}%',
+      ],
+      ['Duplicate Detection Rate', '${_duplicateRate()}%'],
+    ];
+
+    for (final metric in metrics) {
+      final label = sheet.cell(excel.CellIndex.indexByString('A$row'));
+      final value = sheet.cell(excel.CellIndex.indexByString('B$row'));
+      label.value = excel.TextCellValue(metric[0]);
+      value.value = excel.TextCellValue(metric[1]);
+      label.cellStyle = excel.CellStyle(bold: true);
+      row++;
+    }
+  }
+
   int _addExcelSection(
-      excel.Sheet sheet, int startRow, String title, List<List<String>> data) {
-    // Add section title
-    final titleCell = sheet.cell(excel.CellIndex.indexByString("A$startRow"));
+    excel.Sheet sheet,
+    int startRow,
+    String title,
+    List<List<String>> data,
+  ) {
+    final titleCell = sheet.cell(excel.CellIndex.indexByString('A$startRow'));
     titleCell.value = excel.TextCellValue(title);
-    titleCell.cellStyle = excel.CellStyle(
-      bold: true,
-      fontSize: 12,
+    titleCell.cellStyle = excel.CellStyle(bold: true, fontSize: 12);
+    sheet.merge(
+      excel.CellIndex.indexByString('A$startRow'),
+      excel.CellIndex.indexByString('E$startRow'),
     );
-    sheet.merge(excel.CellIndex.indexByString("A$startRow"),
-        excel.CellIndex.indexByString("E$startRow"));
 
     int currentRow = startRow + 2;
-
-    // Add data rows
-    for (var row in data) {
+    for (final row in data) {
       for (var i = 0; i < row.length; i++) {
         final cell = sheet.cell(
           excel.CellIndex.indexByString(
-              "${String.fromCharCode(65 + i)}$currentRow"),
+            '${String.fromCharCode(65 + i)}$currentRow',
+          ),
         );
         cell.value = excel.TextCellValue(row[i]);
 
-        // Style header row
         if (currentRow == startRow + 2) {
           cell.cellStyle = excel.CellStyle(
             bold: true,
-            backgroundColorHex: excel.ExcelColor.fromHexString("#E3E3E3"),
+            backgroundColorHex: excel.ExcelColor.fromHexString('#E3E3E3'),
           );
         }
       }
       currentRow++;
     }
-
     return currentRow;
   }
+
+  // --- UI ---
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(title: Text('Report Generation')),
-        body: SafeArea(
-            child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(children: [
-                  Expanded(
-                    child: Column(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Report Generation'),
+        backgroundColor: AppColors.surface,
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            children: [
+              Expanded(
+                child: Column(
+                  children: [
+                    const SizedBox(height: 20),
+                    Row(
                       children: [
-                        SizedBox(height: 20),
-                        Row(
-                          children: [
-                            box(isActive: selectedIndex == 0 ? true : false),
-                            SizedBox(width: 15),
-                            box(
-                                text: 'PDF',
-                                path: 'assets/svgs/pdf_logo.png',
-                                isActive: selectedIndex == 1 ? true : false)
-                          ],
+                        _formatBox(
+                          text: 'Sheet',
+                          path: 'assets/svgs/excel_logo.png',
+                          isActive: selectedIndex == 0,
+                          onTap: () => setState(() => selectedIndex = 0),
                         ),
-                        SizedBox(height: 20),
-                        if (isLoading)
-                          const CircularProgressIndicator()
-                        else
-                          ExpandedButton(
-                              action: _generateReport,
-                              text:
-                                  'Export ${selectedIndex == 0 ? 'Excel' : 'PDF'} Report'),
-                        SizedBox(height: 20)
+                        const SizedBox(width: 15),
+                        _formatBox(
+                          text: 'PDF',
+                          path: 'assets/svgs/pdf_logo.png',
+                          isActive: selectedIndex == 1,
+                          onTap: () => setState(() => selectedIndex = 1),
+                        ),
                       ],
                     ),
-                  )
-                ]))));
-  }
-
-  Widget box(
-      {String text = 'Sheet',
-      String path = 'assets/svgs/excel_logo.png',
-      bool isActive = false}) {
-    return Expanded(
-        child: Material(
-      color:
-          // ignore: deprecated_member_use
-          isActive
-              ? AppColors.primary.withOpacity(0.1)
-              : AppColors.inputBackground,
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            if (selectedIndex == 0) {
-              selectedIndex = 1;
-            } else {
-              selectedIndex = 0;
-            }
-          });
-        },
-        child: Container(
-          decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              border: isActive ? Border.all(color: AppColors.primary) : null),
-          height: 120,
-          child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [Image.asset(path), Text(text)]),
+                    const SizedBox(height: 20),
+                    if (isLoading)
+                      const CircularProgressIndicator(color: AppColors.primary)
+                    else
+                      ExpandedButton(
+                        action: _generateReport,
+                        text:
+                            'Export ${selectedIndex == 0 ? 'Excel' : 'PDF'} Report',
+                      ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    ));
+    );
+  }
+
+  Widget _formatBox({
+    required String text,
+    required String path,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: Material(
+        color: isActive
+            ? AppColors.primary.withValues(alpha: 0.15)
+            : AppColors.card,
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: onTap,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isActive ? AppColors.primary : AppColors.border,
+                width: isActive ? 1.5 : 0.5,
+              ),
+            ),
+            height: 120,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(path),
+                const SizedBox(height: 8),
+                Text(
+                  text,
+                  style: TextStyle(
+                    color: isActive
+                        ? AppColors.primary
+                        : AppColors.textSecondary,
+                    fontWeight:
+                        isActive ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

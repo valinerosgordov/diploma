@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
+import 'package:ml_practice/models/file_type_mappings.dart';
 
 class ContentClassificationResult {
   final String contentType;
@@ -53,7 +55,7 @@ class FileContentClassifierService {
         detectedKeywords: detectedKeywords,
       );
     } catch (e) {
-      print('Error classifying file content: $e');
+      debugPrint('Error classifying file content: $e');
       return ContentClassificationResult(
         contentType: 'unknown',
         confidenceScores: {},
@@ -67,7 +69,7 @@ class FileContentClassifierService {
     try {
       final String path = file.path.toLowerCase();
 
-      if (_isPdfFile(path)) {
+      if (FileTypeMappings.isPdfFile(path)) {
         // For PDF files
         try {
           final Uint8List bytes = await file.readAsBytes();
@@ -83,10 +85,10 @@ class FileContentClassifierService {
           doc.dispose();
           return text.toLowerCase();
         } catch (e) {
-          print('Error extracting PDF text: $e');
+          debugPrint('Error extracting PDF text: $e');
           return '';
         }
-      } else if (_isImageFile(path)) {
+      } else if (FileTypeMappings.isImageFile(path)) {
         // For image files, use ML Kit text recognition
         try {
           final inputImage = InputImage.fromFile(file);
@@ -94,23 +96,23 @@ class FileContentClassifierService {
               await _textRecognizer.processImage(inputImage);
           return recognizedText.text.toLowerCase();
         } catch (e) {
-          print('Error extracting image text: $e');
+          debugPrint('Error extracting image text: $e');
           return '';
         }
-      } else if (_isTextFile(path)) {
+      } else if (FileTypeMappings.isTextFile(path)) {
         // For text files, read directly
         try {
           String content = await file.readAsString();
           return content.toLowerCase();
         } catch (e) {
-          print('Error reading text file: $e');
+          debugPrint('Error reading text file: $e');
           return '';
         }
       }
 
       return '';
     } catch (e) {
-      print('Error extracting text content: $e');
+      debugPrint('Error extracting text content: $e');
       return '';
     }
   }
@@ -338,62 +340,7 @@ class FileContentClassifierService {
     return word.length > 2 && !commonWords.contains(word);
   }
 
-  bool _isPdfFile(String path) {
-    return path.endsWith('.pdf');
-  }
-
-  bool _isImageFile(String path) {
-    final imageExtensions = [
-      '.jpg',
-      '.jpeg',
-      '.png',
-      '.gif',
-      '.bmp',
-      '.webp',
-      '.heic',
-      '.heif',
-      '.tiff',
-      '.tif'
-    ];
-    return imageExtensions.any((ext) => path.endsWith(ext));
-  }
-
-  bool _isTextFile(String path) {
-    final textExtensions = [
-      '.txt',
-      '.md',
-      '.json',
-      '.xml',
-      '.csv',
-      '.yaml',
-      '.yml',
-      '.dart',
-      '.java',
-      '.kt',
-      '.py',
-      '.js',
-      '.ts',
-      '.html',
-      '.css',
-      '.c',
-      '.cpp',
-      '.h',
-      '.hpp',
-      '.rs',
-      '.go',
-      '.rb',
-      '.php',
-      '.properties',
-      '.conf',
-      '.config',
-      '.ini',
-      '.log'
-    ];
-    return textExtensions.any((ext) => path.endsWith(ext));
-  }
-
-  /// Dispose of resources
-  Future<void> dispose() async {
+  void dispose() {
     _textRecognizer.close();
   }
 }

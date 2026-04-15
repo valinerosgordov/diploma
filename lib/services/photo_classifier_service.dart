@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
 
 class ClassificationResult {
@@ -52,7 +53,7 @@ class PhotoClassifierService {
         confidences: confidences,
       );
     } catch (e) {
-      print('Error classifying image: $e');
+      debugPrint('Error classifying image: $e');
       return ClassificationResult(
         category: 'others',
         mlLabels: [],
@@ -146,8 +147,7 @@ class PhotoClassifierService {
     return natureKeywords.any((keyword) => label.contains(keyword));
   }
 
-  /// Dispose of resources
-  Future<void> dispose() async {
+  void dispose() {
     _labeler.close();
   }
 }
