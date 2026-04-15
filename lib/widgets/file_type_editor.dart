@@ -15,16 +15,22 @@ class FileTypeEditor extends StatelessWidget {
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       itemCount: mappings.length,
       itemBuilder: (context, index) {
         final type = mappings.keys.elementAt(index);
         final extensions = mappings[type]!;
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 16),
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            gradient: AppColors.cardGradient,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border, width: 0.5),
+          ),
           child: ExpansionTile(
-            initiallyExpanded: true,
+            initiallyExpanded: false,
+            tilePadding: const EdgeInsets.symmetric(horizontal: 16),
             leading: FileTypeIcon(
               path: 'file.$type',
               mappings: provider.fileTypeMappings,
@@ -32,48 +38,62 @@ class FileTypeEditor extends StatelessWidget {
             title: Text(
               type.toUpperCase(),
               style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
                 color: AppColors.textPrimary,
+                letterSpacing: 1,
               ),
             ),
             subtitle: Text(
-              '${extensions.length} extension${extensions.length == 1 ? '' : 's'}',
-              style: const TextStyle(color: AppColors.textSecondary),
+              '${extensions.length} extensions',
+              style: const TextStyle(
+                color: AppColors.textHint,
+                fontSize: 12,
+              ),
             ),
-            iconColor: AppColors.textSecondary,
-            collapsedIconColor: AppColors.textSecondary,
-            backgroundColor: AppColors.card,
-            collapsedBackgroundColor: AppColors.card,
+            iconColor: AppColors.textHint,
+            collapsedIconColor: AppColors.textHint,
+            shape: const Border(),
+            collapsedShape: const Border(),
             children: [
               Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: 6,
+                      runSpacing: 6,
                       children: extensions
                           .map(
                             (ext) => Chip(
-                              label: Text(ext),
-                              deleteIcon: const Icon(Icons.close, size: 18),
+                              label: Text(ext, style: const TextStyle(fontSize: 12)),
+                              deleteIcon: const Icon(Icons.close_rounded, size: 16),
                               onDeleted: () =>
                                   provider.removeExtension(type, ext),
+                              visualDensity: VisualDensity.compact,
                             ),
                           )
                           .toList(),
                     ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: () =>
-                          _showAddExtensionDialog(context, provider, type),
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add Extension'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: AppColors.textPrimary,
+                    const SizedBox(height: 12),
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: AppColors.accentGradient,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: ElevatedButton.icon(
+                        onPressed: () =>
+                            _showAddExtensionDialog(context, provider, type),
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text('Add',
+                            style: TextStyle(fontWeight: FontWeight.w600)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          foregroundColor: AppColors.textPrimary,
+                          minimumSize: const Size(0, 40),
+                        ),
                       ),
                     ),
                   ],
@@ -96,19 +116,20 @@ class FileTypeEditor extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Add Extension to ${type.toUpperCase()}'),
+        title: Text('Add to ${type.toUpperCase()}'),
         content: TextField(
           controller: controller,
+          autofocus: true,
           style: const TextStyle(color: AppColors.textPrimary),
           decoration: const InputDecoration(
-            hintText: 'Enter file extension (e.g., pdf)',
+            hintText: 'Extension (e.g., pdf)',
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child:
-                const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+            child: const Text('Cancel',
+                style: TextStyle(color: AppColors.textSecondary)),
           ),
           TextButton(
             onPressed: () {
@@ -117,7 +138,8 @@ class FileTypeEditor extends StatelessWidget {
                 Navigator.pop(context);
               }
             },
-            child: const Text('Add', style: TextStyle(color: AppColors.primary)),
+            child:
+                const Text('Add', style: TextStyle(color: AppColors.primary)),
           ),
         ],
       ),

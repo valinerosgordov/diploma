@@ -11,26 +11,38 @@ class StatsWidget extends StatelessWidget {
     final provider = context.watch<FileAnalysisProvider>();
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
           _StatCard(
-            icon: Icons.folder,
+            icon: Icons.folder_rounded,
             value: provider.totalFiles.toString(),
-            label: 'Total Files',
+            label: 'Files',
+            color: AppColors.primary,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           _StatCard(
-            icon: Icons.data_usage,
-            value: '${provider.totalSize.toStringAsFixed(1)} MB',
-            label: 'Total Size',
+            icon: Icons.storage_rounded,
+            value: '${provider.totalSize.toStringAsFixed(1)}',
+            label: 'MB',
+            color: AppColors.accent,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           _StatCard(
-            icon: Icons.category,
+            icon: Icons.category_rounded,
             value: provider.categories.toString(),
-            label: 'Categories',
+            label: 'Types',
+            color: AppColors.warning,
           ),
+          if (provider.securityIssueCount > 0) ...[
+            const SizedBox(width: 10),
+            _StatCard(
+              icon: Icons.shield_rounded,
+              value: provider.securityIssueCount.toString(),
+              label: 'Issues',
+              color: AppColors.error,
+            ),
+          ],
         ],
       ),
     );
@@ -41,40 +53,53 @@ class _StatCard extends StatelessWidget {
   final IconData icon;
   final String value;
   final String label;
+  final Color color;
 
   const _StatCard({
     required this.icon,
     required this.value,
     required this.label,
+    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
         decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(12),
+          gradient: AppColors.cardGradient,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border, width: 0.5),
         ),
         child: Column(
           children: [
-            Icon(icon, color: AppColors.primary),
-            const SizedBox(height: 8),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 18),
+            ),
+            const SizedBox(height: 10),
             Text(
               value,
               style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
               ),
             ),
+            const SizedBox(height: 2),
             Text(
               label,
               style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 12,
+                color: AppColors.textHint,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.5,
               ),
             ),
           ],

@@ -739,48 +739,67 @@ class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Report Generation'),
-        backgroundColor: AppColors.surface,
+        title: const Text('Export Report'),
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             children: [
-              Expanded(
+              const Spacer(),
+              // Format selector
+              Row(
+                children: [
+                  _formatBox(
+                    text: 'Excel',
+                    icon: Icons.table_chart_rounded,
+                    color: const Color(0xFF00B894),
+                    isActive: selectedIndex == 0,
+                    onTap: () => setState(() => selectedIndex = 0),
+                  ),
+                  const SizedBox(width: 12),
+                  _formatBox(
+                    text: 'PDF',
+                    icon: Icons.picture_as_pdf_rounded,
+                    color: AppColors.error,
+                    isActive: selectedIndex == 1,
+                    onTap: () => setState(() => selectedIndex = 1),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              // Summary
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: AppColors.cardGradient,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.border, width: 0.5),
+                ),
                 child: Column(
                   children: [
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        _formatBox(
-                          text: 'Sheet',
-                          path: 'assets/svgs/excel_logo.png',
-                          isActive: selectedIndex == 0,
-                          onTap: () => setState(() => selectedIndex = 0),
-                        ),
-                        const SizedBox(width: 15),
-                        _formatBox(
-                          text: 'PDF',
-                          path: 'assets/svgs/pdf_logo.png',
-                          isActive: selectedIndex == 1,
-                          onTap: () => setState(() => selectedIndex = 1),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    if (isLoading)
-                      const CircularProgressIndicator(color: AppColors.primary)
-                    else
-                      ExpandedButton(
-                        action: _generateReport,
-                        text:
-                            'Export ${selectedIndex == 0 ? 'Excel' : 'PDF'} Report',
-                      ),
-                    const SizedBox(height: 20),
+                    _summaryRow('Files analyzed',
+                        '${widget.reportData.totalFiles}'),
+                    _summaryRow('Threat level', _threatLevel),
+                    _summaryRow('Sensitive data files',
+                        '${widget.reportData.sensitiveDataFindings.length}'),
+                    _summaryRow('Duplicates found',
+                        '${widget.reportData.duplicateDetections.values.where((d) => d.isDuplicate).length}'),
                   ],
                 ),
               ),
+              const SizedBox(height: 24),
+              if (isLoading)
+                const CircularProgressIndicator(color: AppColors.primary)
+              else
+                ExpandedButton(
+                  action: _generateReport,
+                  icon: const Icon(Icons.download_rounded, size: 20),
+                  text:
+                      'Export ${selectedIndex == 0 ? 'Excel' : 'PDF'}',
+                ),
+              const Spacer(flex: 2),
             ],
           ),
         ),
@@ -788,47 +807,69 @@ class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
     );
   }
 
+  Widget _summaryRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: const TextStyle(
+                  color: AppColors.textHint, fontSize: 13)),
+          Text(value,
+              style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
   Widget _formatBox({
     required String text,
-    required String path,
+    required IconData icon,
+    required Color color,
     required bool isActive,
     required VoidCallback onTap,
   }) {
     return Expanded(
-      child: Material(
-        color: isActive
-            ? AppColors.primary.withValues(alpha: 0.15)
-            : AppColors.card,
-        borderRadius: BorderRadius.circular(10),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: onTap,
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isActive ? AppColors.primary : AppColors.border,
-                width: isActive ? 1.5 : 0.5,
-              ),
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: 110,
+          decoration: BoxDecoration(
+            gradient: isActive ? null : AppColors.cardGradient,
+            color: isActive ? color.withValues(alpha: 0.12) : null,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isActive ? color : AppColors.border,
+              width: isActive ? 1.5 : 0.5,
             ),
-            height: 120,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Image.asset(path),
-                const SizedBox(height: 8),
-                Text(
-                  text,
-                  style: TextStyle(
-                    color: isActive
-                        ? AppColors.primary
-                        : AppColors.textSecondary,
-                    fontWeight:
-                        isActive ? FontWeight.bold : FontWeight.normal,
-                  ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ],
-            ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                text,
+                style: TextStyle(
+                  color: isActive ? color : AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
           ),
         ),
       ),

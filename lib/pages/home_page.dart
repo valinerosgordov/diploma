@@ -70,47 +70,71 @@ class _HomePageState extends State<HomePage> {
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: SingleChildScrollView(
-          child: Column(
-            children: [
-              HeaderWidget(searchController: _searchController),
-              const StatsWidget(),
-              const DistributionChart(),
-              const FileListWidget(),
-            ],
+          physics: const BouncingScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 80),
+            child: Column(
+              children: [
+                HeaderWidget(searchController: _searchController),
+                const SizedBox(height: 8),
+                const StatsWidget(),
+                const SizedBox(height: 16),
+                const DistributionChart(),
+                const FileListWidget(),
+              ],
+            ),
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: provider.isAnalyzing
-            ? null
-            : () async {
-                try {
-                  await provider.analyzeDirectory();
-                  if (context.mounted && provider.hasWarnings) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          '${provider.warnings.length} warning(s) during analysis',
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          gradient: AppColors.primaryGradient,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.4),
+              blurRadius: 20,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: FloatingActionButton.extended(
+          onPressed: provider.isAnalyzing
+              ? null
+              : () async {
+                  try {
+                    await provider.analyzeDirectory();
+                    if (context.mounted && provider.hasWarnings) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '${provider.warnings.length} warning(s) during analysis',
+                          ),
+                          action: SnackBarAction(
+                            label: 'Details',
+                            onPressed: () => _showWarnings(context, provider),
+                          ),
                         ),
-                        action: SnackBarAction(
-                          label: 'Details',
-                          onPressed: () => _showWarnings(context, provider),
-                        ),
-                      ),
-                    );
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                            content: Text('Error analyzing directory: $e')),
+                      );
+                    }
                   }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error analyzing directory: $e')),
-                    );
-                  }
-                }
-              },
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.textPrimary,
-        icon: const Icon(Icons.folder_open),
-        label: const Text('Analyze Directory'),
+                },
+          backgroundColor: Colors.transparent,
+          foregroundColor: AppColors.textPrimary,
+          elevation: 0,
+          icon: const Icon(Icons.radar, size: 22),
+          label: const Text(
+            'Analyze',
+            style: TextStyle(fontWeight: FontWeight.w600, letterSpacing: 0.5),
+          ),
+        ),
       ),
     );
   }

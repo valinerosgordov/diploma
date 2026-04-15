@@ -20,49 +20,81 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           brightness: Brightness.dark,
+          fontFamily: 'Segoe UI',
           colorScheme: const ColorScheme.dark(
             primary: AppColors.primary,
+            secondary: AppColors.accent,
             surface: AppColors.surface,
             onPrimary: AppColors.textPrimary,
             onSurface: AppColors.textPrimary,
           ),
           scaffoldBackgroundColor: AppColors.background,
           appBarTheme: const AppBarTheme(
-            backgroundColor: AppColors.surface,
+            backgroundColor: Colors.transparent,
             foregroundColor: AppColors.textPrimary,
             elevation: 0,
+            centerTitle: true,
+            titleTextStyle: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+              color: AppColors.textPrimary,
+            ),
           ),
           cardTheme: CardThemeData(
             color: AppColors.card,
             elevation: 0,
             shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: AppColors.border, width: 0.5),
+            ),
+          ),
+          chipTheme: ChipThemeData(
+            backgroundColor: AppColors.cardHover,
+            labelStyle: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+            deleteIconColor: AppColors.textSecondary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            side: const BorderSide(color: AppColors.border, width: 0.5),
+          ),
+          dialogTheme: DialogThemeData(
+            backgroundColor: AppColors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            titleTextStyle: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          snackBarTheme: SnackBarThemeData(
+            backgroundColor: AppColors.card,
+            contentTextStyle: const TextStyle(color: AppColors.textPrimary),
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-          ),
-          chipTheme: const ChipThemeData(
-            backgroundColor: AppColors.cardHover,
-            labelStyle: TextStyle(color: AppColors.textPrimary),
-            deleteIconColor: AppColors.textSecondary,
-          ),
-          dialogTheme: const DialogThemeData(
-            backgroundColor: AppColors.surface,
-            titleTextStyle: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          snackBarTheme: const SnackBarThemeData(
-            backgroundColor: AppColors.card,
-            contentTextStyle: TextStyle(color: AppColors.textPrimary),
+            behavior: SnackBarBehavior.floating,
           ),
           inputDecorationTheme: InputDecorationTheme(
             filled: true,
             fillColor: AppColors.inputBackground,
-            hintStyle: const TextStyle(color: AppColors.textHint),
+            hintStyle: const TextStyle(
+              color: AppColors.textHint,
+              fontSize: 14,
+            ),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
             ),
           ),
           useMaterial3: true,

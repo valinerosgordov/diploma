@@ -15,33 +15,41 @@ class HeaderWidget extends StatelessWidget {
     final provider = context.watch<FileAnalysisProvider>();
 
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       child: Column(
         children: [
+          // Top bar
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              IconButton(
-                icon: Icon(
-                  provider.isEditingFileTypes ? Icons.done : Icons.settings,
-                  color: AppColors.textSecondary,
-                ),
+              // Settings button
+              _GlassIconButton(
+                icon: provider.isEditingFileTypes
+                    ? Icons.done_rounded
+                    : Icons.tune_rounded,
                 onPressed: provider.toggleEditingFileTypes,
               ),
-              const Text(
-                'File Analysis Tool',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+              const Spacer(),
+              // Title
+              ShaderMask(
+                shaderCallback: (bounds) =>
+                    AppColors.primaryGradient.createShader(bounds),
+                child: const Text(
+                  'File Analysis',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
+              const Spacer(),
+              // Actions
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.history,
-                        color: AppColors.textSecondary),
+                  _GlassIconButton(
+                    icon: Icons.history_rounded,
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -50,15 +58,11 @@ class HeaderWidget extends StatelessWidget {
                         ),
                       );
                     },
-                    tooltip: 'Report History',
                   ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.file_download_outlined,
-                      color: provider.hasAnalysisData
-                          ? AppColors.primary
-                          : AppColors.textHint,
-                    ),
+                  const SizedBox(width: 8),
+                  _GlassIconButton(
+                    icon: Icons.download_rounded,
+                    isActive: provider.hasAnalysisData,
                     onPressed: provider.hasAnalysisData
                         ? () {
                             Navigator.push(
@@ -71,30 +75,70 @@ class HeaderWidget extends StatelessWidget {
                             );
                           }
                         : null,
-                    tooltip: 'Generate Report',
                   ),
                 ],
               ),
             ],
           ),
           const SizedBox(height: 16),
-          TextField(
-            controller: searchController,
-            style: const TextStyle(color: AppColors.textPrimary),
-            decoration: InputDecoration(
-              hintText: 'Search files...',
-              prefixIcon:
-                  const Icon(Icons.search, color: AppColors.textHint),
-              filled: true,
-              fillColor: AppColors.inputBackground,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
+          // Search bar
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.inputBackground,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border, width: 0.5),
             ),
-            onChanged: (value) => provider.setSearchQuery(value),
+            child: TextField(
+              controller: searchController,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 14,
+              ),
+              decoration: const InputDecoration(
+                hintText: 'Search files...',
+                prefixIcon: Icon(Icons.search_rounded,
+                    color: AppColors.textHint, size: 20),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 14),
+              ),
+              onChanged: (value) => provider.setSearchQuery(value),
+            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _GlassIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final bool isActive;
+
+  const _GlassIconButton({
+    required this.icon,
+    this.onPressed,
+    this.isActive = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: AppColors.glass,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border, width: 0.5),
+      ),
+      child: IconButton(
+        icon: Icon(
+          icon,
+          size: 20,
+          color: isActive ? AppColors.textSecondary : AppColors.textHint,
+        ),
+        onPressed: onPressed,
+        padding: EdgeInsets.zero,
       ),
     );
   }

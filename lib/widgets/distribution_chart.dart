@@ -17,49 +17,75 @@ class DistributionChart extends StatelessWidget {
     if (distribution.isEmpty) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(12),
+          gradient: AppColors.cardGradient,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border, width: 0.5),
         ),
-        child: PieChart(
-          dataMap: distribution,
-          animationDuration: const Duration(milliseconds: 800),
-          chartLegendSpacing: 32,
-          chartRadius: MediaQuery.of(context).size.width / 3,
-          colorList: const [
-            Color(0xFFE94F4F),
-            Color(0xFFFF6B6B),
-            Color(0xFFFFA07A),
-            Color(0xFF34D399),
-            Color(0xFF60A5FA),
-            Color(0xFFA78BFA),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.pie_chart_rounded,
+                    color: AppColors.primaryLight, size: 18),
+                SizedBox(width: 8),
+                Text(
+                  'Distribution',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            PieChart(
+              dataMap: distribution,
+              animationDuration: const Duration(milliseconds: 1000),
+              chartLegendSpacing: 24,
+              chartRadius: MediaQuery.of(context).size.width / 3.5,
+              colorList: const [
+                Color(0xFF6C5CE7),
+                Color(0xFF00CEC9),
+                Color(0xFFFDCB6E),
+                Color(0xFFFF6B6B),
+                Color(0xFF74B9FF),
+                Color(0xFFA29BFE),
+                Color(0xFF00B894),
+                Color(0xFFE17055),
+              ],
+              initialAngleInDegree: 0,
+              chartType: ChartType.ring,
+              ringStrokeWidth: 24,
+              legendOptions: const LegendOptions(
+                showLegendsInRow: false,
+                legendPosition: LegendPosition.right,
+                showLegends: true,
+                legendTextStyle: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+              chartValuesOptions: const ChartValuesOptions(
+                showChartValueBackground: false,
+                showChartValues: true,
+                showChartValuesInPercentage: true,
+                showChartValuesOutside: true,
+                chartValueStyle: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 11,
+                ),
+              ),
+            ),
           ],
-          initialAngleInDegree: 0,
-          chartType: ChartType.disc,
-          legendOptions: const LegendOptions(
-            showLegendsInRow: true,
-            legendPosition: LegendPosition.bottom,
-            showLegends: true,
-            legendTextStyle: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          chartValuesOptions: const ChartValuesOptions(
-            showChartValueBackground: false,
-            showChartValues: true,
-            showChartValuesInPercentage: true,
-            showChartValuesOutside: false,
-            chartValueStyle: TextStyle(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
-          ),
         ),
       ),
     );

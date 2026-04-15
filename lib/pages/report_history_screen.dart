@@ -44,21 +44,16 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
 
   Future<void> _deleteReport(ReportHistory report) async {
     try {
-      // Delete from storage
       final file = File(report.filePath);
       if (await file.exists()) {
         await file.delete();
       }
-
-      // Delete from history
       await _historyService.deleteReport(report.filePath);
-
-      // Refresh list
       await _loadReports();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Report deleted successfully')),
+          const SnackBar(content: Text('Report deleted')),
         );
       }
     } catch (e) {
@@ -97,11 +92,22 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Report History'),
-        backgroundColor: AppColors.surface,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
-            onPressed: _loadReports,
+          Container(
+            margin: const EdgeInsets.only(right: 12),
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.glass,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border, width: 0.5),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              onPressed: _loadReports,
+              padding: EdgeInsets.zero,
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ),
@@ -110,95 +116,137 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
               child: CircularProgressIndicator(color: AppColors.primary),
             )
           : _reports.isEmpty
-              ? const Center(
-                  child: Text(
-                    'No reports found',
-                    style: TextStyle(color: AppColors.textHint, fontSize: 16),
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(Icons.history_rounded,
+                            color: AppColors.primary, size: 26),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'No reports yet',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 )
               : ListView.builder(
+                  physics: const BouncingScrollPhysics(),
                   itemCount: _reports.length,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   itemBuilder: (context, index) {
                     final report = _reports[index];
-                    return Card(
-                      color: AppColors.card,
-                      margin: const EdgeInsets.only(bottom: 16),
+                    final isPdf = report.fileType == 'pdf';
+                    final color =
+                        isPdf ? AppColors.error : const Color(0xFF00B894);
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        gradient: AppColors.cardGradient,
+                        borderRadius: BorderRadius.circular(16),
+                        border:
+                            Border.all(color: AppColors.border, width: 0.5),
+                      ),
                       child: ListTile(
-                        leading: Icon(
-                          report.fileType == 'pdf'
-                              ? Icons.picture_as_pdf
-                              : Icons.table_chart,
-                          color: AppColors.primary,
-                          size: 32,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        leading: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            isPdf
+                                ? Icons.picture_as_pdf_rounded
+                                : Icons.table_chart_rounded,
+                            color: color,
+                            size: 22,
+                          ),
                         ),
                         title: Text(
                           report.fileName,
                           style: const TextStyle(
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w600,
                             color: AppColors.textPrimary,
+                            fontSize: 14,
                           ),
                         ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            const SizedBox(height: 4),
                             Text(
-                              'Generated: ${DateFormat('MMM d, y HH:mm').format(report.generatedAt)}',
+                              DateFormat('MMM d, y  HH:mm')
+                                  .format(report.generatedAt),
                               style: const TextStyle(
-                                  color: AppColors.textSecondary),
+                                color: AppColors.textHint,
+                                fontSize: 12,
+                              ),
                             ),
                             Text(
-                              'Files analyzed: ${report.totalFiles}',
+                              '${report.totalFiles} files analyzed',
                               style: const TextStyle(
-                                  color: AppColors.textSecondary),
+                                color: AppColors.textHint,
+                                fontSize: 12,
+                              ),
                             ),
                           ],
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.open_in_new,
-                                  color: AppColors.textSecondary),
+                            _ActionButton(
+                              icon: Icons.open_in_new_rounded,
+                              color: AppColors.accent,
                               onPressed: () => _openReport(report),
-                              tooltip: 'Open Report',
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline,
-                                  color: AppColors.error),
+                            const SizedBox(width: 6),
+                            _ActionButton(
+                              icon: Icons.delete_outline_rounded,
+                              color: AppColors.error,
                               onPressed: () => showDialog(
                                 context: context,
-                                builder: (context) => AlertDialog(
+                                builder: (_) => AlertDialog(
                                   title: const Text('Delete Report'),
                                   content: const Text(
-                                    'Are you sure you want to delete this report? This action cannot be undone.',
+                                    'Delete this report permanently?',
                                     style: TextStyle(
                                         color: AppColors.textSecondary),
                                   ),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.pop(context),
-                                      child: const Text(
-                                        'Cancel',
-                                        style: TextStyle(
-                                            color: AppColors.textSecondary),
-                                      ),
+                                      child: const Text('Cancel',
+                                          style: TextStyle(
+                                              color: AppColors.textSecondary)),
                                     ),
                                     TextButton(
                                       onPressed: () {
                                         Navigator.pop(context);
                                         _deleteReport(report);
                                       },
-                                      child: const Text(
-                                        'Delete',
-                                        style:
-                                            TextStyle(color: AppColors.error),
-                                      ),
+                                      child: const Text('Delete',
+                                          style: TextStyle(
+                                              color: AppColors.error)),
                                     ),
                                   ],
                                 ),
                               ),
-                              tooltip: 'Delete Report',
                             ),
                           ],
                         ),
@@ -207,6 +255,35 @@ class _ReportHistoryScreenState extends State<ReportHistoryScreen> {
                     );
                   },
                 ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final VoidCallback onPressed;
+
+  const _ActionButton({
+    required this.icon,
+    required this.color,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: IconButton(
+        icon: Icon(icon, size: 16, color: color),
+        onPressed: onPressed,
+        padding: EdgeInsets.zero,
+      ),
     );
   }
 }
