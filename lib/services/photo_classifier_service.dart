@@ -116,7 +116,6 @@ class PhotoClassifierService {
       'muscle',
       'nail',
       'foot',
-      'selfie',
     ];
     return faceKeywords.any((keyword) => label.contains(keyword));
   }

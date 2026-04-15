@@ -621,7 +621,7 @@ class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
             e.value.isDuplicate.toString(),
             e.value.isDuplicate ? (e.value.matchedWith ?? 'N/A') : 'N/A',
             '${(e.value.similarityScore * 100).toStringAsFixed(1)}%',
-            e.value.matchType,
+            e.value.matchType.toString(),
           ]),
     ]);
     row += 2;

@@ -112,15 +112,8 @@ class DuplicateDetectionService {
 
   /// Stream-based SHA-256 hash — no full file in memory
   Future<String> _calculateFileHash(File file) async {
-    final output = AccumulatorSink<Digest>();
-    final input = sha256.startChunkedConversion(output);
-
-    await for (final chunk in file.openRead()) {
-      input.add(chunk);
-    }
-
-    input.close();
-    return output.events.single.toString();
+    final digest = await sha256.bind(file.openRead()).first;
+    return digest.toString();
   }
 
   Future<String> _extractTextContent(File file) async {
@@ -214,13 +207,9 @@ class DuplicateDetectionService {
     return trigrams;
   }
 
-  void clearCache() {
-    _fileHashes.clear();
-    _fileContents.clear();
-  }
-
   void dispose() {
     _textRecognizer.close();
-    clearCache();
+    _fileHashes.clear();
+    _fileContents.clear();
   }
 }
