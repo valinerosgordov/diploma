@@ -26,34 +26,111 @@ class FileListWidget extends StatelessWidget {
 
     if (provider.selectedFiles.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 60),
+        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 40),
         child: Column(
           children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
+            // Animated-looking concentric rings
+            SizedBox(
+              width: 120,
+              height: 120,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Outer ring
+                  Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.08),
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  // Middle ring
+                  Container(
+                    width: 88,
+                    height: 88,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.15),
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                  // Inner glow
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          AppColors.primary.withValues(alpha: 0.2),
+                          AppColors.primary.withValues(alpha: 0.05),
+                        ],
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.radar_rounded,
+                      color: AppColors.primaryLight,
+                      size: 26,
+                    ),
+                  ),
+                ],
               ),
-              child: const Icon(Icons.radar, color: AppColors.primary, size: 30),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             const Text(
-              'No files analyzed yet',
+              'Ready to analyze',
               style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             const Text(
-              'Tap Analyze to select files',
+              'Select files to scan for threats,\nduplicate content, and sensitive data',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.textHint,
                 fontSize: 13,
+                height: 1.5,
               ),
+            ),
+            const SizedBox(height: 24),
+            // Feature hints
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _FeatureChip(
+                    icon: Icons.image_rounded,
+                    label: 'ML Classification',
+                    color: AppColors.accent),
+                const SizedBox(width: 8),
+                _FeatureChip(
+                    icon: Icons.shield_rounded,
+                    label: 'Security Scan',
+                    color: AppColors.primary),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _FeatureChip(
+                    icon: Icons.content_copy_rounded,
+                    label: 'Duplicates',
+                    color: AppColors.warning),
+                const SizedBox(width: 8),
+                _FeatureChip(
+                    icon: Icons.description_rounded,
+                    label: 'Reports',
+                    color: AppColors.info),
+              ],
             ),
           ],
         ),
@@ -268,6 +345,45 @@ class _FileCard extends StatelessWidget {
             if (analysis.threat != null)
               ThreatAnalysisWidget(result: analysis.threat!),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _FeatureChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _FeatureChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 0.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ],
       ),
     );

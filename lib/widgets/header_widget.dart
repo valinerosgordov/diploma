@@ -15,72 +15,96 @@ class HeaderWidget extends StatelessWidget {
     final provider = context.watch<FileAnalysisProvider>();
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Top bar
           Row(
             children: [
-              // Settings button
+              // Logo + title
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  gradient: AppColors.primaryGradient,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.security_rounded,
+                    color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'File Analysis',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  Text(
+                    provider.hasAnalysisData
+                        ? '${provider.totalFiles} files scanned'
+                        : 'Ready to scan',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textHint,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              // Actions
               _GlassIconButton(
                 icon: provider.isEditingFileTypes
                     ? Icons.done_rounded
                     : Icons.tune_rounded,
                 onPressed: provider.toggleEditingFileTypes,
               ),
-              const Spacer(),
-              // Title
-              ShaderMask(
-                shaderCallback: (bounds) =>
-                    AppColors.primaryGradient.createShader(bounds),
-                child: const Text(
-                  'File Analysis',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    letterSpacing: 0.5,
-                  ),
-                ),
+              const SizedBox(width: 8),
+              _GlassIconButton(
+                icon: Icons.history_rounded,
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ReportHistoryScreen(),
+                    ),
+                  );
+                },
               ),
-              const Spacer(),
-              // Actions
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _GlassIconButton(
-                    icon: Icons.history_rounded,
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ReportHistoryScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  _GlassIconButton(
-                    icon: Icons.download_rounded,
-                    isActive: provider.hasAnalysisData,
-                    onPressed: provider.hasAnalysisData
-                        ? () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ReportGenerationScreen(
-                                  reportData: provider.buildReportData(),
-                                ),
-                              ),
-                            );
-                          }
-                        : null,
-                  ),
-                ],
+              const SizedBox(width: 8),
+              _GradientIconButton(
+                icon: Icons.download_rounded,
+                isActive: provider.hasAnalysisData,
+                onPressed: provider.hasAnalysisData
+                    ? () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ReportGenerationScreen(
+                              reportData: provider.buildReportData(),
+                            ),
+                          ),
+                        );
+                      }
+                    : null,
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           // Search bar
           Container(
             decoration: BoxDecoration(
@@ -94,12 +118,16 @@ class HeaderWidget extends StatelessWidget {
                 color: AppColors.textPrimary,
                 fontSize: 14,
               ),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'Search files...',
-                prefixIcon: Icon(Icons.search_rounded,
-                    color: AppColors.textHint, size: 20),
+                prefixIcon: ShaderMask(
+                  shaderCallback: (bounds) =>
+                      AppColors.primaryGradient.createShader(bounds),
+                  child: const Icon(Icons.search_rounded,
+                      color: Colors.white, size: 20),
+                ),
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
               ),
               onChanged: (value) => provider.setSearchQuery(value),
             ),
@@ -113,30 +141,65 @@ class HeaderWidget extends StatelessWidget {
 class _GlassIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onPressed;
-  final bool isActive;
 
-  const _GlassIconButton({
+  const _GlassIconButton({required this.icon, this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: AppColors.glass,
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: AppColors.border, width: 0.5),
+      ),
+      child: IconButton(
+        icon: Icon(icon, size: 18, color: AppColors.textSecondary),
+        onPressed: onPressed,
+        padding: EdgeInsets.zero,
+      ),
+    );
+  }
+}
+
+class _GradientIconButton extends StatelessWidget {
+  final IconData icon;
+  final bool isActive;
+  final VoidCallback? onPressed;
+
+  const _GradientIconButton({
     required this.icon,
+    required this.isActive,
     this.onPressed,
-    this.isActive = true,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 40,
-      height: 40,
+      width: 38,
+      height: 38,
       decoration: BoxDecoration(
-        color: AppColors.glass,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border, width: 0.5),
+        gradient: isActive ? AppColors.primaryGradient : null,
+        color: isActive ? null : AppColors.glass,
+        borderRadius: BorderRadius.circular(11),
+        border: isActive
+            ? null
+            : Border.all(color: AppColors.border, width: 0.5),
+        boxShadow: isActive
+            ? [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
       ),
       child: IconButton(
-        icon: Icon(
-          icon,
-          size: 20,
-          color: isActive ? AppColors.textSecondary : AppColors.textHint,
-        ),
+        icon: Icon(icon,
+            size: 18,
+            color: isActive ? Colors.white : AppColors.textHint),
         onPressed: onPressed,
         padding: EdgeInsets.zero,
       ),
