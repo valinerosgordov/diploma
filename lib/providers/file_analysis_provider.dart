@@ -8,6 +8,8 @@ import 'package:ml_practice/services/photo_classifier_service.dart';
 import 'package:ml_practice/services/file_content_classifier_service.dart';
 import 'package:ml_practice/services/duplicate_detection_service.dart';
 import 'package:ml_practice/services/auto_tagging_service.dart';
+import 'package:ml_practice/services/sensitive_data_service.dart';
+import 'package:ml_practice/services/threat_assessment_service.dart';
 
 class FileAnalysisProvider extends ChangeNotifier {
   static const int maxFiles = 200;
@@ -18,6 +20,8 @@ class FileAnalysisProvider extends ChangeNotifier {
   final DuplicateDetectionService _duplicateDetector =
       DuplicateDetectionService();
   final AutoTaggingService _autoTagger = AutoTaggingService();
+  final SensitiveDataService _sensitiveScanner = SensitiveDataService();
+  final ThreatAssessmentService _threatAssessor = ThreatAssessmentService();
   final FileTypeMappings _fileTypeMappings = FileTypeMappings();
 
   bool _isAnalyzing = false;
@@ -56,6 +60,15 @@ class FileAnalysisProvider extends ChangeNotifier {
   bool get hasAnalysisData => _fileAnalysis.isNotEmpty;
   bool get hasWarnings => _warnings.isNotEmpty;
 
+  int get securityIssueCount {
+    int count = 0;
+    for (final result in _fileAnalysis.values) {
+      if (result.sensitiveData?.hasSensitiveData ?? false) count++;
+      if (result.threat?.hasThreat ?? false) count++;
+    }
+    return count;
+  }
+
   List<File> get filteredFiles {
     if (_searchQuery.isEmpty) return _selectedFiles;
     return _selectedFiles
@@ -87,6 +100,8 @@ class FileAnalysisProvider extends ChangeNotifier {
     await _contentClassifier.initialize();
     await _duplicateDetector.initialize();
     await _autoTagger.initialize();
+    await _sensitiveScanner.initialize();
+    await _threatAssessor.initialize();
     _isInitialized = true;
   }
 
@@ -147,7 +162,6 @@ class FileAnalysisProvider extends ChangeNotifier {
       for (var i = 0; i < files.length; i += batchSize) {
         final batch = files.skip(i).take(batchSize).toList();
 
-        // Process files sequentially within batch to avoid race condition
         for (final file in batch) {
           final fileEntity = File(file.path!);
           _selectedFiles.add(fileEntity);
@@ -199,11 +213,20 @@ class FileAnalysisProvider extends ChangeNotifier {
 
       final duplicate = await _duplicateDetector.checkForDuplicate(file);
 
+      // Security analysis
+      final sensitiveData = await _sensitiveScanner.scanFile(file);
+      final threat = await _threatAssessor.assessFile(
+        file,
+        sensitiveData: sensitiveData,
+      );
+
       _fileAnalysis[file.path] = FileAnalysisResult(
         photo: photo,
         content: content,
         duplicate: duplicate,
         tags: tags,
+        sensitiveData: sensitiveData,
+        threat: threat,
       );
 
       notifyListeners();
@@ -219,6 +242,8 @@ class FileAnalysisProvider extends ChangeNotifier {
     _contentClassifier.dispose();
     _duplicateDetector.dispose();
     _autoTagger.dispose();
+    _sensitiveScanner.dispose();
+    _threatAssessor.dispose();
     super.dispose();
   }
 }

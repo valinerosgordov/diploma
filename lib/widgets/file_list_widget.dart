@@ -6,6 +6,7 @@ import 'package:ml_practice/models/app_colors.dart';
 import 'package:ml_practice/providers/file_analysis_provider.dart';
 import 'package:ml_practice/widgets/file_type_icon.dart';
 import 'package:ml_practice/widgets/analysis_widgets.dart';
+import 'package:ml_practice/widgets/security_widgets.dart';
 import 'package:ml_practice/widgets/file_type_editor.dart';
 
 class FileListWidget extends StatelessWidget {
@@ -181,8 +182,12 @@ class _FileCard extends StatelessWidget {
                   ],
                 ),
               )
-            else if (analysis.duplicate != null)
-              DuplicateIndicatorWidget(result: analysis.duplicate!),
+            else ...[
+              if (analysis.duplicate != null)
+                DuplicateIndicatorWidget(result: analysis.duplicate!),
+              if (analysis.threat != null)
+                ThreatIndicatorWidget(result: analysis.threat!),
+            ],
           ],
         ),
         iconColor: AppColors.textSecondary,
@@ -199,6 +204,10 @@ class _FileCard extends StatelessWidget {
               DuplicateAnalysisWidget(result: analysis.duplicate!),
             if (analysis.tags != null)
               TagAnalysisWidget(result: analysis.tags!),
+            if (analysis.sensitiveData != null)
+              SensitiveDataWidget(result: analysis.sensitiveData!),
+            if (analysis.threat != null)
+              ThreatAnalysisWidget(result: analysis.threat!),
           ],
         ],
       ),

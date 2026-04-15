@@ -3,6 +3,7 @@ import 'package:ml_practice/models/app_colors.dart';
 import 'package:ml_practice/models/report_data.dart';
 import 'package:ml_practice/models/report_history.dart';
 import 'package:ml_practice/services/report_history_service.dart';
+import 'package:ml_practice/services/threat_assessment_service.dart';
 import 'package:ml_practice/widgets/expanded_button.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:cross_file/cross_file.dart';
@@ -29,12 +30,9 @@ class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
   final ReportHistoryService _historyService = ReportHistoryService();
 
   String get _threatLevel {
-    final duplicates = widget.reportData.duplicateDetections;
-    final hasDuplicates = duplicates.values.any((d) => d.isDuplicate);
-
-    if (hasDuplicates) return 'High';
-    if (widget.reportData.totalFiles > 0) return 'Medium';
-    return 'Low';
+    final threats = widget.reportData.threatAssessments.values.toList();
+    if (threats.isEmpty) return ThreatLevel.safe.label;
+    return ThreatAssessmentService.aggregateLevel(threats).label;
   }
 
   Future<void> _generateReport() async {
@@ -226,6 +224,10 @@ class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
                 '${data.duplicateDetections.length} comparisons'),
             _infoRow(
                 'Auto-Tagged', '${data.autoTags.length} files'),
+            _infoRow('Security Issues',
+                '${data.sensitiveDataFindings.length} files with sensitive data'),
+            _infoRow('Threat Assessments',
+                '${data.threatAssessments.length} files with threats'),
           ]),
         ],
       ),
@@ -312,6 +314,46 @@ class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
       ],
     );
 
+    // Sensitive Data Findings
+    _addChunkedSection(
+      pdf: pdf,
+      theme: theme,
+      pageFormat: pageFormat,
+      title: '7. Sensitive Data Findings',
+      entries: data.sensitiveDataFindings.entries.toList(),
+      itemsPerPage: itemsPerPage,
+      buildItem: (entry) => [
+        _infoRow('File', p.basename(entry.key)),
+        _infoRow('Total Findings', '${entry.value.totalFindings}'),
+        _infoRow(
+          'Types',
+          entry.value.summary.entries
+              .map((e) => '${e.key.label}: ${e.value}')
+              .join(', '),
+        ),
+        pw.SizedBox(height: 8),
+      ],
+    );
+
+    // Threat Assessments
+    _addChunkedSection(
+      pdf: pdf,
+      theme: theme,
+      pageFormat: pageFormat,
+      title: '8. Threat Assessments',
+      entries: data.threatAssessments.entries.toList(),
+      itemsPerPage: itemsPerPage,
+      buildItem: (entry) => [
+        _infoRow('File', p.basename(entry.key)),
+        _infoRow('Threat Level', entry.value.overallLevel.label),
+        _infoRow('Risk Score', '${entry.value.riskScore}/100'),
+        ...entry.value.findings.map(
+          (f) => _infoRow('Finding', f.detail),
+        ),
+        pw.SizedBox(height: 8),
+      ],
+    );
+
     // Performance Metrics
     pdf.addPage(
       pw.MultiPage(
@@ -319,7 +361,7 @@ class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
         pageFormat: pageFormat,
         margin: const pw.EdgeInsets.all(10),
         build: (context) => [
-          _pdfSection('7. ML Model Performance', [
+          _pdfSection('9. ML Model Performance', [
             _infoRow(
               'Avg Confidence (Photo)',
               '${_avgConfidence(data.photoClassifications.values.expand((r) => r.confidences))}%',
@@ -478,6 +520,10 @@ class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
     final analysis = workbook['File Analysis'];
     _excelFileAnalysis(analysis, data);
 
+    // Security Sheet
+    final security = workbook['Security'];
+    _excelSecurity(security, data);
+
     // Performance Sheet
     final perf = workbook['Performance'];
     _excelPerformance(perf, data);
@@ -525,6 +571,8 @@ class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
       ['Content Classifications', '${data.contentClassifications.length} files'],
       ['Duplicate Detections', '${data.duplicateDetections.length} comparisons'],
       ['Auto-Tagged Files', '${data.autoTags.length} files'],
+      ['Sensitive Data Files', '${data.sensitiveDataFindings.length} files'],
+      ['Threat Detections', '${data.threatAssessments.length} files'],
     ];
 
     for (final item in summaryData) {
@@ -618,6 +666,34 @@ class _ReportGenerationScreenState extends State<ReportGenerationScreen> {
       label.cellStyle = excel.CellStyle(bold: true);
       row++;
     }
+  }
+
+  void _excelSecurity(excel.Sheet sheet, ReportData data) {
+    int row = 1;
+
+    // Sensitive Data
+    row = _addExcelSection(sheet, row, 'Sensitive Data Findings', [
+      ['File', 'Total Findings', 'Types'],
+      ...data.sensitiveDataFindings.entries.map((e) => [
+            p.basename(e.key),
+            '${e.value.totalFindings}',
+            e.value.summary.entries
+                .map((s) => '${s.key.label}: ${s.value}')
+                .join(', '),
+          ]),
+    ]);
+    row += 2;
+
+    // Threat Assessments
+    _addExcelSection(sheet, row, 'Threat Assessments', [
+      ['File', 'Threat Level', 'Risk Score', 'Findings'],
+      ...data.threatAssessments.entries.map((e) => [
+            p.basename(e.key),
+            e.value.overallLevel.label,
+            '${e.value.riskScore}/100',
+            e.value.findings.map((f) => f.detail).join('; '),
+          ]),
+    ]);
   }
 
   int _addExcelSection(
