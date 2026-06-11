@@ -28,9 +28,9 @@ class FileAnalysisProvider extends ChangeNotifier {
   bool _isEditingFileTypes = false;
   bool _isInitialized = false;
 
-  List<File> _selectedFiles = [];
+  final List<File> _selectedFiles = [];
   Map<String, double> _fileDistribution = {};
-  Map<String, FileAnalysisResult> _fileAnalysis = {};
+  final Map<String, FileAnalysisResult> _fileAnalysis = {};
 
   int _totalFiles = 0;
   double _totalSize = 0;

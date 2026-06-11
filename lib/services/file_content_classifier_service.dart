@@ -79,7 +79,7 @@ class FileContentClassifierService {
           // Extract text from all pages
           for (int i = 0; i < doc.pages.count; i++) {
             final PdfTextExtractor extractor = PdfTextExtractor(doc);
-            text += await extractor.extractText(startPageIndex: i) + '\n';
+            text += '${extractor.extractText(startPageIndex: i)}\n';
           }
 
           doc.dispose();

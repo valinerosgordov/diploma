@@ -1,5 +1,5 @@
 class FileTypeMappings {
-  Map<String, Set<String>> _mappings;
+  final Map<String, Set<String>> _mappings;
 
   FileTypeMappings()
       : _mappings = {
